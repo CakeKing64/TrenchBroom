@@ -66,6 +66,8 @@ void setDefaultProperties(
   }
 }
 
+kdl_reflect_impl(Entity);
+
 const vm::bbox3 Entity::DefaultBounds = vm::bbox3{8.0};
 
 Entity::Entity()
@@ -464,16 +466,6 @@ void Entity::updateCachedProperties(const EntityPropertyConfig& propertyConfig)
   {
     m_cachedProperties.modelTransformation = vm::mat4x4::identity();
   }
-}
-
-bool operator==(const Entity& lhs, const Entity& rhs)
-{
-  return lhs.properties() == rhs.properties();
-}
-
-bool operator!=(const Entity& lhs, const Entity& rhs)
-{
-  return !(lhs == rhs);
 }
 
 } // namespace TrenchBroom::Model

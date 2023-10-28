@@ -18,6 +18,7 @@
  */
 
 #include "Model/Brush.h"
+#include "Model/BrushBuilder.h"
 #include "Model/BrushNode.h"
 #include "Model/Entity.h"
 #include "Model/EntityNode.h"
@@ -62,6 +63,166 @@ TEST_CASE("checkLinkedGroupsToUpdate")
   CHECK(checkLinkedGroupsToUpdate({&groupNode1, &groupNode2}));
   CHECK(checkLinkedGroupsToUpdate({&linkedGroupNode, &groupNode2}));
   CHECK_FALSE(checkLinkedGroupsToUpdate({&groupNode1, &linkedGroupNode}));
+}
+
+TEST_CASE("generateEntityLinkIds")
+{
+  auto brushBuilder = Model::BrushBuilder{Model::MapFormat::Quake3, vm::bbox3{8192.0}};
+
+  SECTION("Does nothing if subtrees have different structures")
+  {
+    auto outerGroupNode = Model::GroupNode{Model::Group{"outer"}};
+    auto* outerEntityNode = new Model::EntityNode{Model::Entity{}};
+    auto* outerBrushNode =
+      new Model::BrushNode{brushBuilder.createCube(64.0, "texture").value()};
+
+    auto* innerGroupNode = new Model::GroupNode{Model::Group{"inner"}};
+    auto* innerBrushNode =
+      new Model::BrushNode{brushBuilder.createCube(64.0, "texture").value()};
+    auto* innerEntityNode = new Model::EntityNode{Model::Entity{}};
+
+    innerGroupNode->addChildren({innerBrushNode, innerEntityNode});
+    outerGroupNode.addChildren({outerEntityNode, outerBrushNode, innerGroupNode});
+
+    auto linkedOuterGroupNode = Model::GroupNode{Model::Group{"outer"}};
+    auto* linkedOuterEntityNode = new Model::EntityNode{Model::Entity{}};
+    auto* linkedOuterBrushNode =
+      new Model::BrushNode{brushBuilder.createCube(64.0, "texture").value()};
+
+    auto* linkedInnerGroupNode = new Model::GroupNode{Model::Group{"inner"}};
+    auto* linkedInnerBrushNode =
+      new Model::BrushNode{brushBuilder.createCube(64.0, "texture").value()};
+    auto* linkedInnerEntityNode = new Model::EntityNode{Model::Entity{}};
+
+    Model::setLinkedGroupId(outerGroupNode, "linkedGroupId");
+    Model::setLinkedGroupId(linkedOuterGroupNode, "linkedGroupId");
+
+    SECTION("If one outer group node has no children")
+    {
+      CHECK(
+        generateEntityLinkIds({&outerGroupNode, &linkedOuterGroupNode}) == std::nullopt);
+    }
+
+    SECTION("If one outer group node has fewer children")
+    {
+      linkedOuterGroupNode.addChildren({linkedOuterEntityNode, linkedOuterBrushNode});
+      CHECK(
+        generateEntityLinkIds({&outerGroupNode, &linkedOuterGroupNode}) == std::nullopt);
+    }
+
+    SECTION("If one inner group node has fewer children")
+    {
+      linkedOuterGroupNode.addChildren(
+        {linkedOuterEntityNode, linkedOuterBrushNode, linkedInnerGroupNode});
+      linkedInnerGroupNode->addChildren({linkedInnerBrushNode});
+      CHECK(
+        generateEntityLinkIds({&outerGroupNode, &linkedOuterGroupNode}) == std::nullopt);
+    }
+
+    SECTION("If one outer group node has children in different order")
+    {
+      linkedInnerGroupNode->addChildren({linkedInnerBrushNode, linkedInnerEntityNode});
+      linkedOuterGroupNode.addChildren(
+        {linkedOuterEntityNode, linkedInnerGroupNode, linkedOuterBrushNode});
+      CHECK(
+        generateEntityLinkIds({&outerGroupNode, &linkedOuterGroupNode}) == std::nullopt);
+    }
+
+    SECTION("If one inner group node has children in different order")
+    {
+      linkedInnerGroupNode->addChildren({linkedInnerEntityNode, linkedInnerBrushNode});
+      linkedOuterGroupNode.addChildren(
+        {linkedOuterEntityNode, linkedOuterBrushNode, linkedInnerGroupNode});
+      CHECK(
+        generateEntityLinkIds({&outerGroupNode, &linkedOuterGroupNode}) == std::nullopt);
+    }
+
+    SECTION("If both groups have the same structure")
+    {
+      linkedInnerGroupNode->addChildren({linkedInnerBrushNode, linkedInnerEntityNode});
+      linkedOuterGroupNode.addChildren(
+        {linkedOuterEntityNode, linkedOuterBrushNode, linkedInnerGroupNode});
+      CHECK(
+        generateEntityLinkIds({&outerGroupNode, &linkedOuterGroupNode}) != std::nullopt);
+    }
+  }
+
+  SECTION("Generates IDs for top level entities")
+  {
+    auto outerGroupNode = Model::GroupNode{Model::Group{"outer"}};
+    auto* outerEntityNode = new Model::EntityNode{Model::Entity{}};
+    auto* outerBrushNode =
+      new Model::BrushNode{brushBuilder.createCube(64.0, "texture").value()};
+    outerGroupNode.addChildren({outerEntityNode, outerBrushNode});
+
+    auto linkedOuterGroupNode1 = Model::GroupNode{Model::Group{"outer"}};
+    auto* linkedOuterEntityNode1 = new Model::EntityNode{Model::Entity{}};
+    auto* linkedOuterBrushNode1 =
+      new Model::BrushNode{brushBuilder.createCube(64.0, "texture").value()};
+    linkedOuterGroupNode1.addChildren({linkedOuterEntityNode1, linkedOuterBrushNode1});
+
+    auto linkedOuterGroupNode2 = Model::GroupNode{Model::Group{"outer"}};
+    auto* linkedOuterEntityNode2 = new Model::EntityNode{Model::Entity{}};
+    auto* linkedOuterBrushNode2 =
+      new Model::BrushNode{brushBuilder.createCube(64.0, "texture").value()};
+    linkedOuterGroupNode2.addChildren({linkedOuterEntityNode2, linkedOuterBrushNode2});
+
+    Model::setLinkedGroupId(outerGroupNode, "linkedGroupId");
+    Model::setLinkedGroupId(linkedOuterGroupNode1, "linkedGroupId");
+    Model::setLinkedGroupId(linkedOuterGroupNode2, "linkedGroupId");
+
+    const auto entityLinkIds = generateEntityLinkIds(
+      {&outerGroupNode, &linkedOuterGroupNode1, &linkedOuterGroupNode2});
+
+    REQUIRE(entityLinkIds != std::nullopt);
+    CHECK(entityLinkIds->size() == 3);
+    CHECK(
+      entityLinkIds->at(outerEntityNode) == entityLinkIds->at(linkedOuterEntityNode1));
+    CHECK(
+      entityLinkIds->at(outerEntityNode) == entityLinkIds->at(linkedOuterEntityNode2));
+  }
+
+  SECTION("Generates IDs for nested entities")
+  {
+    auto outerGroupNode = Model::GroupNode{Model::Group{"outer"}};
+    auto* outerEntityNode = new Model::EntityNode{Model::Entity{}};
+    auto* outerBrushNode =
+      new Model::BrushNode{brushBuilder.createCube(64.0, "texture").value()};
+
+    auto* innerGroupNode = new Model::GroupNode{Model::Group{"inner"}};
+    auto* innerBrushNode =
+      new Model::BrushNode{brushBuilder.createCube(64.0, "texture").value()};
+    auto* innerEntityNode = new Model::EntityNode{Model::Entity{}};
+
+    innerGroupNode->addChildren({innerBrushNode, innerEntityNode});
+    outerGroupNode.addChildren({outerEntityNode, outerBrushNode, innerGroupNode});
+
+    auto linkedOuterGroupNode = Model::GroupNode{Model::Group{"outer"}};
+    auto* linkedOuterEntityNode = new Model::EntityNode{Model::Entity{}};
+    auto* linkedOuterBrushNode =
+      new Model::BrushNode{brushBuilder.createCube(64.0, "texture").value()};
+
+    auto* linkedInnerGroupNode = new Model::GroupNode{Model::Group{"inner"}};
+    auto* linkedInnerBrushNode =
+      new Model::BrushNode{brushBuilder.createCube(64.0, "texture").value()};
+    auto* linkedInnerEntityNode = new Model::EntityNode{Model::Entity{}};
+
+    linkedInnerGroupNode->addChildren({linkedInnerBrushNode, linkedInnerEntityNode});
+    linkedOuterGroupNode.addChildren(
+      {linkedOuterEntityNode, linkedOuterBrushNode, linkedInnerGroupNode});
+
+    Model::setLinkedGroupId(outerGroupNode, "linkedGroupId");
+    Model::setLinkedGroupId(linkedOuterGroupNode, "linkedGroupId");
+
+    const auto entityLinkIds =
+      generateEntityLinkIds({&outerGroupNode, &linkedOuterGroupNode});
+
+    REQUIRE(entityLinkIds != std::nullopt);
+    CHECK(entityLinkIds->size() == 4);
+    CHECK(entityLinkIds->at(outerEntityNode) != entityLinkIds->at(innerEntityNode));
+    CHECK(entityLinkIds->at(outerEntityNode) == entityLinkIds->at(linkedOuterEntityNode));
+    CHECK(entityLinkIds->at(innerEntityNode) == entityLinkIds->at(linkedInnerEntityNode));
+  }
 }
 
 class UpdateLinkedGroupsHelperTest : public MapDocumentTest

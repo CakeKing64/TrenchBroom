@@ -23,12 +23,15 @@
 #include "Result.h"
 
 #include <memory>
+#include <optional>
+#include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
 
 namespace TrenchBroom::Model
 {
+class EntityNode;
 class GroupNode;
 class Node;
 } // namespace TrenchBroom::Model
@@ -44,6 +47,37 @@ class MapDocumentCommandFacade;
  * linked set.
  */
 bool checkLinkedGroupsToUpdate(const std::vector<Model::GroupNode*>& changedLinkedGroups);
+
+/**
+ * Generate unique IDs for every entity in the given link set. For each of the given
+ * groups, every entity at the same position in the node tree gets the same ID. Consider
+ * the following example where we pass two linked groups A and B with identical
+ * structures:
+ *
+ * GroupNode A             GroupNode B
+ * - EntityNode A1         - EntityNode B1
+ * - BrushNode A2          - BrushNode B2
+ * - GroupNode A3          - GroupNode B3
+ *   - BrushNode A3_1        - BrushNode B3_1
+ *   - EntityNode A3_2       - EntityNode B3_2
+ *
+ * Given that A and B have the same link ID, then the returned map will contain the
+ * following data:
+ * - A1: some_unique_id
+ * - B1: some_unique_id
+ * - A3_2: some_other_unique_id
+ * - B3_2: some_other_unique_id
+ *
+ * Note how the entities at the same positions in the subtrees such as A1 and B1 received
+ * the same ID, and entities at different positions, such as A1 and A3_2 received
+ * different IDs.
+ *
+ * The function returns nullopt if any of the passed groups' subtrees have a different
+ * structure. The function requires that the given vector contains at least two group
+ * nodes, and that all top level group nodes in the given vector have the same link ID.
+ */
+std::optional<std::unordered_map<const Model::EntityNode*, std::string>>
+generateEntityLinkIds(const std::vector<Model::GroupNode*>& groupNodes);
 
 /**
  * A helper class to add support for updating linked groups to commands.

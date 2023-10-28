@@ -19,11 +19,14 @@
 
 #include "UpdateLinkedGroupsHelper.h"
 
+#include "Ensure.h"
 #include "Error.h"
+#include "Model/EntityNode.h"
 #include "Model/GroupNode.h"
 #include "Model/ModelUtils.h"
 #include "Model/Node.h"
 #include "Model/WorldNode.h"
+#include "Uuid.h"
 #include "View/MapDocumentCommandFacade.h"
 
 #include <kdl/overload.h>
@@ -40,6 +43,45 @@ namespace TrenchBroom::View
 {
 namespace
 {
+template <typename F>
+bool visitNodesPerPosition(const std::vector<Model::Node*>& nodes, const F& f)
+{
+  if (nodes.empty())
+  {
+    return true;
+  }
+
+  if (!f(nodes))
+  {
+    return false;
+  }
+
+  const auto childCount = nodes.front()->childCount();
+  if (!std::all_of(nodes.begin(), nodes.end(), [&](const auto& node) {
+        return node->childCount() == childCount;
+      }))
+  {
+    return false;
+  }
+
+  for (size_t i = 0; i < childCount; ++i)
+  {
+    auto toVisit = std::vector<Model::Node*>{};
+    toVisit.reserve(nodes.size());
+
+    for (const auto& node : nodes)
+    {
+      toVisit.push_back(node->children().at(i));
+    }
+
+    if (!visitNodesPerPosition(toVisit, f))
+    {
+      return false;
+    }
+  }
+
+  return true;
+}
 
 // Order groups so that descendants will be updated before their ancestors
 auto compareByAncestry(const Model::GroupNode* lhs, const Model::GroupNode* rhs)
@@ -58,6 +100,48 @@ bool checkLinkedGroupsToUpdate(const std::vector<Model::GroupNode*>& changedLink
 
   return std::adjacent_find(std::begin(linkedGroupIds), std::end(linkedGroupIds))
          == std::end(linkedGroupIds);
+}
+
+std::optional<std::unordered_map<const Model::EntityNode*, std::string>>
+generateEntityLinkIds(const std::vector<Model::GroupNode*>& groupNodes)
+{
+  ensure(groupNodes.size() > 1, "Generate entity links for at least two linked groups");
+
+  const auto linkedGroupId = std::accumulate(
+    std::next(groupNodes.begin()),
+    groupNodes.end(),
+    groupNodes.front()->group().linkedGroupId(),
+    [](auto commonLinkedGroupId, const auto* groupNode) {
+      const auto& currentLinkedGroupId = groupNode->group().linkedGroupId();
+      return commonLinkedGroupId && commonLinkedGroupId == currentLinkedGroupId
+               ? commonLinkedGroupId
+               : std::nullopt;
+    });
+  ensure(linkedGroupId, "All groups are linked and share the same ID");
+
+  auto result = std::unordered_map<const Model::EntityNode*, std::string>{};
+  const auto success = visitNodesPerPosition(
+    std::vector<Model::Node*>{groupNodes.begin(), groupNodes.end()},
+    [&](const auto& nodes) {
+      assert(!nodes.empty());
+      if (dynamic_cast<Model::EntityNode*>(nodes.front()))
+      {
+        const auto entityLinkId = generateUuid();
+        for (const auto* node : nodes)
+        {
+          const auto* entityNode = dynamic_cast<const Model::EntityNode*>(node);
+          if (!entityNode)
+          {
+            return false;
+          }
+
+          result[entityNode] = entityLinkId;
+        }
+      }
+      return true;
+    });
+
+  return success ? std::optional{std::move(result)} : std::nullopt;
 }
 
 UpdateLinkedGroupsHelper::UpdateLinkedGroupsHelper(

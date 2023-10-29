@@ -34,9 +34,12 @@
 #include "Model/TagVisitor.h"
 #include "Model/Validator.h"
 #include "Model/WorldNode.h"
+#include "Uuid.h"
 
+#include "kdl/zip_iterator.h"
 #include <kdl/overload.h>
 #include <kdl/parallel.h>
+#include <kdl/range.h>
 #include <kdl/result.h>
 #include <kdl/result_fold.h>
 #include <kdl/string_utils.h>
@@ -308,6 +311,71 @@ void preserveEntityProperties(
     ++coIt;
   }
 }
+
+template <typename F>
+Result<void> visitNodesPerPosition(const Node& sourceNode, Node& targetNode, const F& f)
+{
+  return f(sourceNode, targetNode).and_then([&](const auto& recurse) -> Result<void> {
+    if (recurse)
+    {
+      if (sourceNode.childCount() != targetNode.childCount())
+      {
+        return Error{"Inconsistent linked group structure"};
+      }
+
+      return kdl::fold_results(kdl::vec_transform(
+        kdl::make_zip_range(sourceNode.children(), targetNode.children()),
+        [&](auto& childPair) {
+          auto& [sourceChild, targetChild] = childPair;
+          return visitNodesPerPosition(*sourceChild, *targetChild, f);
+        }));
+    }
+
+    return Result<void>{};
+  });
+}
+
+template <typename N>
+Result<bool> checkType(const Node& node, const bool successResult)
+{
+  return dynamic_cast<const N*>(&node)
+           ? Result<bool>{successResult}
+           : Result<bool>{Error{"Inconsistent linked group structure"}};
+}
+
+auto makeCopyLinkIds(const std::string& containingLinkedGroupId)
+{
+  return [&](const Node& sourceNode, Node& targetNode) {
+    return sourceNode.accept(kdl::overload(
+      [&](const WorldNode*) { return checkType<WorldNode>(targetNode, true); },
+      [&](const LayerNode*) { return checkType<WorldNode>(targetNode, true); },
+      [&](const GroupNode* sourceGroupNode) {
+        // don't recurse into nested linked groups
+        const auto& nestedLinkedGroupId = sourceGroupNode->group().linkedGroupId();
+        const auto recurse =
+          !nestedLinkedGroupId || nestedLinkedGroupId == containingLinkedGroupId;
+        return checkType<GroupNode>(targetNode, recurse);
+      },
+      [&](const EntityNode* sourceEntityNode) {
+        auto* targetEntityNode = dynamic_cast<EntityNode*>(&targetNode);
+        if (!targetEntityNode)
+        {
+          return Result<bool>{Error{"Inconsistent linked group structure"}};
+        }
+
+        const auto& sourceLinkId = sourceEntityNode->entity().linkId();
+        ensure(sourceLinkId, "Source entity has link ID");
+
+        auto targetEntity = targetEntityNode->entity();
+        targetEntity.setLinkId(*sourceLinkId);
+        targetEntityNode->setEntity(std::move(targetEntity));
+
+        return Result<bool>{true};
+      },
+      [&](const BrushNode*) { return checkType<BrushNode>(targetNode, false); },
+      [&](const PatchNode*) { return checkType<PatchNode>(targetNode, false); }));
+  };
+}
 } // namespace
 
 Result<UpdateLinkedGroupsResult> updateLinkedGroups(
@@ -339,6 +407,77 @@ Result<UpdateLinkedGroupsResult> updateLinkedGroups(
             static_cast<Node*>(targetGroupNode), std::move(newChildren));
         });
     }));
+}
+
+Result<void> copyLinkIds(const GroupNode& sourceNode, GroupNode& targetNode)
+{
+  return visitNodesPerPosition(
+    sourceNode, targetNode, makeCopyLinkIds(*sourceNode.group().linkedGroupId()));
+}
+
+Result<void> setLinkIds(const std::vector<GroupNode*>& groupNodes)
+{
+  if (groupNodes.size() < 2)
+  {
+    return Error{"Link set must contain at least two groups"};
+  }
+
+  auto& sourceGroupNode = *groupNodes.front();
+  const auto& sourceLinkedGroupId = sourceGroupNode.group().linkedGroupId();
+
+  sourceGroupNode.accept(kdl::overload(
+    [](const WorldNode*) {},
+    [](const LayerNode*) {},
+    [&](auto&& thisLambda, const GroupNode* groupNode) {
+      // Don't recurse into nested linked groups
+      const auto& nestedLinkedGroupId = groupNode->group().linkedGroupId();
+      if (!nestedLinkedGroupId || nestedLinkedGroupId == sourceLinkedGroupId)
+      {
+        groupNode->visitChildren(thisLambda);
+      }
+    },
+    [](auto&& thisLambda, EntityNode* entityNode) {
+      auto entity = entityNode->entity();
+      entity.setLinkId(generateUuid());
+      entityNode->setEntity(std::move(entity));
+
+      entityNode->visitChildren(thisLambda);
+    },
+    [](const BrushNode*) {},
+    [](const PatchNode*) {}));
+
+  return kdl::fold_results(kdl::vec_transform(
+                             kdl::range{std::next(groupNodes.begin()), groupNodes.end()},
+                             [&](auto* targetGroupNode) {
+                               return copyLinkIds(sourceGroupNode, *targetGroupNode);
+                             }))
+    .or_else([&](auto e) {
+      resetLinkIds(groupNodes);
+      return Result<void>{std::move(e)};
+    });
+}
+
+void resetLinkIds(const std::vector<GroupNode*>& groupNodes)
+{
+  Node::visitAll(
+    groupNodes,
+    kdl::overload(
+      [](auto&& thisLambda, const WorldNode* worldNode) {
+        worldNode->visitChildren(thisLambda);
+      },
+      [](auto&& thisLambda, const LayerNode* layerNode) {
+        layerNode->visitChildren(thisLambda);
+      },
+      [](auto&& thisLambda, const GroupNode* groupNode) {
+        groupNode->visitChildren(thisLambda);
+      },
+      [](EntityNode* entityNode) {
+        auto entity = entityNode->entity();
+        entity.resetLinkId();
+        entityNode->setEntity(std::move(entity));
+      },
+      [](const BrushNode*) {},
+      [](const PatchNode*) {}));
 }
 
 GroupNode::GroupNode(Group group)

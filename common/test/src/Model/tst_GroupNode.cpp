@@ -619,4 +619,230 @@ TEST_CASE("GroupNode.updateLinkedGroupsAndPreserveEntityProperties")
     .transform_error([](const auto&) { FAIL(); });
 }
 
+namespace
+{
+bool hasAnyEntityLinks(const Node& node)
+{
+  auto result = false;
+  node.accept(kdl::overload(
+    [](auto&& thisLambda, const WorldNode* worldNode) {
+      worldNode->visitChildren(thisLambda);
+    },
+    [](auto&& thisLambda, const LayerNode* layerNode) {
+      layerNode->visitChildren(thisLambda);
+    },
+    [](auto&& thisLambda, const GroupNode* groupNode) {
+      groupNode->visitChildren(thisLambda);
+    },
+    [&](const EntityNode* entityNode) {
+      result = result || entityNode->entity().linkId() != std::nullopt;
+    },
+    [](const BrushNode*) {},
+    [](const PatchNode*) {}));
+  return result;
+}
+} // namespace
+
+TEST_CASE("GroupNode.setLinkIds")
+{
+  auto brushBuilder = Model::BrushBuilder{Model::MapFormat::Quake3, vm::bbox3{8192.0}};
+
+  auto outerGroupNode = Model::GroupNode{Model::Group{"outer"}};
+  auto* outerEntityNode = new Model::EntityNode{Model::Entity{}};
+  auto* outerBrushNode =
+    new Model::BrushNode{brushBuilder.createCube(64.0, "texture").value()};
+
+  auto* innerGroupNode = new Model::GroupNode{Model::Group{"inner"}};
+  auto* innerBrushNode =
+    new Model::BrushNode{brushBuilder.createCube(64.0, "texture").value()};
+  auto* innerEntityNode = new Model::EntityNode{Model::Entity{}};
+
+  innerGroupNode->addChildren({innerBrushNode, innerEntityNode});
+  outerGroupNode.addChildren({outerEntityNode, outerBrushNode, innerGroupNode});
+
+  auto linkedOuterGroupNode = Model::GroupNode{Model::Group{"outer"}};
+  auto* linkedOuterEntityNode = new Model::EntityNode{Model::Entity{}};
+  auto* linkedOuterBrushNode =
+    new Model::BrushNode{brushBuilder.createCube(64.0, "texture").value()};
+
+  auto* linkedInnerGroupNode = new Model::GroupNode{Model::Group{"inner"}};
+  auto* linkedInnerBrushNode =
+    new Model::BrushNode{brushBuilder.createCube(64.0, "texture").value()};
+  auto* linkedInnerEntityNode = new Model::EntityNode{Model::Entity{}};
+
+  Model::setLinkedGroupId(outerGroupNode, "linkedGroupId");
+  Model::setLinkedGroupId(linkedOuterGroupNode, "linkedGroupId");
+
+  SECTION("If one outer group node has no children")
+  {
+    CHECK(
+      setLinkIds({&outerGroupNode, &linkedOuterGroupNode})
+      == Result<void>{Error{"Inconsistent linked group structure"}});
+    CHECK(!hasAnyEntityLinks(outerGroupNode));
+    CHECK(!hasAnyEntityLinks(linkedOuterGroupNode));
+  }
+
+  SECTION("If one outer group node has fewer children")
+  {
+    linkedOuterGroupNode.addChildren({linkedOuterEntityNode, linkedOuterBrushNode});
+    CHECK(
+      setLinkIds({&outerGroupNode, &linkedOuterGroupNode})
+      == Result<void>{Error{"Inconsistent linked group structure"}});
+    CHECK(!hasAnyEntityLinks(outerGroupNode));
+    CHECK(!hasAnyEntityLinks(linkedOuterGroupNode));
+  }
+
+  SECTION("If one inner group node has fewer children")
+  {
+    linkedOuterGroupNode.addChildren(
+      {linkedOuterEntityNode, linkedOuterBrushNode, linkedInnerGroupNode});
+    linkedInnerGroupNode->addChildren({linkedInnerBrushNode});
+    CHECK(
+      setLinkIds({&outerGroupNode, &linkedOuterGroupNode})
+      == Result<void>{Error{"Inconsistent linked group structure"}});
+    CHECK(!hasAnyEntityLinks(outerGroupNode));
+    CHECK(!hasAnyEntityLinks(linkedOuterGroupNode));
+  }
+
+  SECTION("If one outer group node has children in different order")
+  {
+    linkedInnerGroupNode->addChildren({linkedInnerBrushNode, linkedInnerEntityNode});
+    linkedOuterGroupNode.addChildren(
+      {linkedOuterEntityNode, linkedInnerGroupNode, linkedOuterBrushNode});
+    CHECK(
+      setLinkIds({&outerGroupNode, &linkedOuterGroupNode})
+      == Result<void>{Error{"Inconsistent linked group structure"}});
+    CHECK(!hasAnyEntityLinks(outerGroupNode));
+    CHECK(!hasAnyEntityLinks(linkedOuterGroupNode));
+  }
+
+  SECTION("If one inner group node has children in different order")
+  {
+    linkedInnerGroupNode->addChildren({linkedInnerEntityNode, linkedInnerBrushNode});
+    linkedOuterGroupNode.addChildren(
+      {linkedOuterEntityNode, linkedOuterBrushNode, linkedInnerGroupNode});
+    CHECK(
+      setLinkIds({&outerGroupNode, &linkedOuterGroupNode})
+      == Result<void>{Error{"Inconsistent linked group structure"}});
+    CHECK(!hasAnyEntityLinks(outerGroupNode));
+    CHECK(!hasAnyEntityLinks(linkedOuterGroupNode));
+  }
+
+  SECTION("If both groups have the same structure")
+  {
+    linkedInnerGroupNode->addChildren({linkedInnerBrushNode, linkedInnerEntityNode});
+    linkedOuterGroupNode.addChildren(
+      {linkedOuterEntityNode, linkedOuterBrushNode, linkedInnerGroupNode});
+
+    SECTION("With less than two groups")
+    {
+      CHECK(
+        setLinkIds({})
+        == Result<void>{Error{"Link set must contain at least two groups"}});
+      CHECK(
+        setLinkIds({&outerGroupNode})
+        == Result<void>{Error{"Link set must contain at least two groups"}});
+    }
+
+    SECTION("With two groups")
+    {
+      REQUIRE(outerEntityNode->entity().linkId() == std::nullopt);
+      REQUIRE(innerEntityNode->entity().linkId() == std::nullopt);
+      REQUIRE(outerEntityNode->entity() == linkedOuterEntityNode->entity());
+      REQUIRE(innerEntityNode->entity() == linkedInnerEntityNode->entity());
+
+      CHECK(setLinkIds({&outerGroupNode, &linkedOuterGroupNode}).is_success());
+
+      CHECK(outerEntityNode->entity().linkId() != std::nullopt);
+      CHECK(innerEntityNode->entity().linkId() != std::nullopt);
+      CHECK(outerEntityNode->entity().linkId() != innerEntityNode->entity().linkId());
+      CHECK(outerEntityNode->entity() == linkedOuterEntityNode->entity());
+      CHECK(innerEntityNode->entity() == linkedInnerEntityNode->entity());
+    }
+
+    SECTION("With three groups")
+    {
+      auto linkedOuterGroupNode2 = Model::GroupNode{Model::Group{"outer"}};
+      auto* linkedOuterEntityNode2 = new Model::EntityNode{Model::Entity{}};
+      auto* linkedOuterBrushNode2 =
+        new Model::BrushNode{brushBuilder.createCube(64.0, "texture").value()};
+
+      auto* linkedInnerGroupNode2 = new Model::GroupNode{Model::Group{"inner"}};
+      auto* linkedInnerBrushNode2 =
+        new Model::BrushNode{brushBuilder.createCube(64.0, "texture").value()};
+      auto* linkedInnerEntityNode2 = new Model::EntityNode{Model::Entity{}};
+
+      linkedInnerGroupNode2->addChildren({linkedInnerBrushNode2, linkedInnerEntityNode2});
+      linkedOuterGroupNode2.addChildren(
+        {linkedOuterEntityNode2, linkedOuterBrushNode2, linkedInnerGroupNode2});
+
+      Model::setLinkedGroupId(linkedOuterGroupNode2, "linkedGroupId");
+
+      REQUIRE(outerEntityNode->entity().linkId() == std::nullopt);
+      REQUIRE(innerEntityNode->entity().linkId() == std::nullopt);
+      REQUIRE(outerEntityNode->entity() == linkedOuterEntityNode->entity());
+      REQUIRE(innerEntityNode->entity() == linkedInnerEntityNode->entity());
+      REQUIRE(outerEntityNode->entity() == linkedOuterEntityNode2->entity());
+      REQUIRE(innerEntityNode->entity() == linkedInnerEntityNode2->entity());
+
+      CHECK(setLinkIds({&outerGroupNode, &linkedOuterGroupNode, &linkedOuterGroupNode2})
+              .is_success());
+
+      CHECK(outerEntityNode->entity().linkId() != std::nullopt);
+      CHECK(innerEntityNode->entity().linkId() != std::nullopt);
+      CHECK(outerEntityNode->entity().linkId() != innerEntityNode->entity().linkId());
+      CHECK(outerEntityNode->entity() == linkedOuterEntityNode->entity());
+      CHECK(innerEntityNode->entity() == linkedInnerEntityNode->entity());
+      CHECK(outerEntityNode->entity() == linkedOuterEntityNode2->entity());
+      CHECK(innerEntityNode->entity() == linkedInnerEntityNode2->entity());
+    }
+
+    SECTION("With nested linked groups")
+    {
+      Model::setLinkedGroupId(*innerGroupNode, "nestedLinkedGroupId");
+      Model::setLinkedGroupId(*linkedInnerGroupNode, "nestedLinkedGroupId");
+
+      SECTION("Only outer groups")
+      {
+        REQUIRE(outerEntityNode->entity().linkId() == std::nullopt);
+        REQUIRE(innerEntityNode->entity().linkId() == std::nullopt);
+        REQUIRE(outerEntityNode->entity() == linkedOuterEntityNode->entity());
+        REQUIRE(innerEntityNode->entity() == linkedInnerEntityNode->entity());
+
+        CHECK(setLinkIds({&outerGroupNode, &linkedOuterGroupNode}).is_success());
+
+        CHECK(outerEntityNode->entity().linkId() != std::nullopt);
+        CHECK(innerEntityNode->entity().linkId() == std::nullopt);
+        CHECK(outerEntityNode->entity() == linkedOuterEntityNode->entity());
+        CHECK(innerEntityNode->entity() == linkedInnerEntityNode->entity());
+      }
+
+      SECTION("Inner groups, then outer groups")
+      {
+        REQUIRE(outerEntityNode->entity().linkId() == std::nullopt);
+        REQUIRE(innerEntityNode->entity().linkId() == std::nullopt);
+        REQUIRE(outerEntityNode->entity() == linkedOuterEntityNode->entity());
+        REQUIRE(innerEntityNode->entity() == linkedInnerEntityNode->entity());
+
+        CHECK(setLinkIds({innerGroupNode, linkedInnerGroupNode}).is_success());
+
+        CHECK(outerEntityNode->entity().linkId() == std::nullopt);
+        CHECK(innerEntityNode->entity().linkId() != std::nullopt);
+        CHECK(outerEntityNode->entity() == linkedOuterEntityNode->entity());
+        CHECK(innerEntityNode->entity() == linkedInnerEntityNode->entity());
+
+        const auto innerEntityLinkId = innerEntityNode->entity().linkId();
+
+        CHECK(setLinkIds({&outerGroupNode, &linkedOuterGroupNode}).is_success());
+
+        CHECK(outerEntityNode->entity().linkId() != std::nullopt);
+        CHECK(innerEntityNode->entity().linkId() == innerEntityLinkId);
+        CHECK(outerEntityNode->entity().linkId() != innerEntityLinkId);
+        CHECK(outerEntityNode->entity() == linkedOuterEntityNode->entity());
+        CHECK(innerEntityNode->entity() == linkedInnerEntityNode->entity());
+      }
+    }
+  }
+}
+
 } // namespace TrenchBroom::Model

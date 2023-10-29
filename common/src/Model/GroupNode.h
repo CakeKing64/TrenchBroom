@@ -72,6 +72,10 @@ Result<UpdateLinkedGroupsResult> updateLinkedGroups(
   const std::vector<Model::GroupNode*>& targetGroupNodes,
   const vm::bbox3& worldBounds);
 
+Result<void> copyLinkIds(const GroupNode& sourceNode, GroupNode& targetNode);
+Result<void> setLinkIds(const std::vector<GroupNode*>& groupNodes);
+void resetLinkIds(const std::vector<GroupNode*>& groupNodes);
+
 /**
  * A group of nodes that can be edited as one.
  *

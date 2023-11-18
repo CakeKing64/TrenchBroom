@@ -205,7 +205,7 @@ void EntityModelRenderer::doRender(RenderContext& renderContext)
 
     shader.set("Orientation", static_cast<int>(model->orientation()));
 
-    const auto transformation = vm::mat4x4f{entityNode->entity().modelTransformation()};
+    const auto transformation = vm::mat4x4f{entityNode->entity().modelTransformationOffset()};
     const auto multMatrix =
       MultiplyModelMatrix{renderContext.transformation(), transformation};
 

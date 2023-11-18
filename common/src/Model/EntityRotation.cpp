@@ -208,7 +208,7 @@ EntityRotationInfo entityRotationInfo(const Entity& entity)
 }
 
 vm::mat4x4 entityRotation(
-  const std::vector<EntityProperty>& properties, const EntityRotationInfo& info)
+  const std::vector<EntityProperty>& properties, const EntityRotationInfo& info, bool rotate)
 {
   switch (info.type)
   {
@@ -273,7 +273,7 @@ vm::mat4x4 entityRotation(
     // z = roll
     const auto roll = +vm::to_radians(angles.z());
     const auto pitch = +vm::to_radians(angles.x());
-    const auto yaw = +vm::to_radians(angles.y());
+    const auto yaw = +vm::to_radians(angles.y() - (rotate ? 90 : 0));
     return vm::rotation_matrix(roll, pitch, yaw);
   }
   case EntityRotationType::Mangle: {
@@ -297,9 +297,20 @@ vm::mat4x4 entityRotation(
   }
 }
 
+vm::mat4x4 entityRotation(
+    const std::vector<EntityProperty>& properties, const EntityRotationInfo& info)
+{
+    return entityRotation(properties, info, false);
+}
+
+vm::mat4x4 entityRotation(const Entity& entity, bool rotate)
+{
+    return entityRotation(entity.properties(), entityRotationInfo(entity), rotate);
+}
+
 vm::mat4x4 entityRotation(const Entity& entity)
 {
-  return entityRotation(entity.properties(), entityRotationInfo(entity));
+  return entityRotation(entity, false);
 }
 
 vm::vec3 entityYawPitchRoll(const vm::mat4x4& transformation, const vm::mat4x4& rotation)

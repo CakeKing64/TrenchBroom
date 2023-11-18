@@ -111,7 +111,9 @@ private:
     std::string classname;
     vm::vec3 origin;
     vm::mat4x4 rotation;
+    vm::mat4x4 rotationOffset;
     vm::mat4x4 modelTransformation;
+    vm::mat4x4 modelTransformationOffset;
   };
 
   CachedProperties m_cachedProperties;
@@ -161,6 +163,7 @@ public:
 
   Assets::ModelSpecification modelSpecification() const;
   const vm::mat4x4& modelTransformation() const;
+  const vm::mat4x4& modelTransformationOffset() const;
 
   Assets::DecalSpecification decalSpecification() const;
 
@@ -195,6 +198,7 @@ public:
   const vm::vec3& origin() const;
   void setOrigin(const EntityPropertyConfig& propertyConfig, const vm::vec3& origin);
 
+  const vm::mat4x4& Entity::rotationEx() const;
   const vm::mat4x4& rotation() const;
 
   std::vector<EntityProperty> propertiesWithKey(const std::string& property) const;

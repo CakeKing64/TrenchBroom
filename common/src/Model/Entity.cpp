@@ -210,6 +210,11 @@ const vm::mat4x4& Entity::modelTransformation() const
   return m_cachedProperties.modelTransformation;
 }
 
+const vm::mat4x4& Entity::modelTransformationOffset() const
+{
+    return m_cachedProperties.modelTransformationOffset;
+}
+
 Assets::DecalSpecification Entity::decalSpecification() const
 {
   if (
@@ -235,7 +240,9 @@ void Entity::unsetEntityDefinitionAndModel()
   m_definition = Assets::AssetReference<Assets::EntityDefinition>{};
   m_model = nullptr;
   m_cachedProperties.rotation = entityRotation(*this);
+  m_cachedProperties.rotationOffset = entityRotation(*this, true);
   m_cachedProperties.modelTransformation = vm::mat4x4::identity();
+  m_cachedProperties.modelTransformationOffset = vm::mat4x4::identity();
 }
 
 void Entity::addOrUpdateProperty(
@@ -390,6 +397,11 @@ const vm::mat4x4& Entity::rotation() const
   return m_cachedProperties.rotation;
 }
 
+const vm::mat4x4& Entity::rotationEx() const
+{
+    return m_cachedProperties.rotationOffset;
+}
+
 std::vector<EntityProperty> Entity::propertiesWithKey(const std::string& key) const
 {
   return kdl::vec_filter(
@@ -455,6 +467,7 @@ void Entity::updateCachedProperties(const EntityPropertyConfig& propertyConfig)
     originValue ? vm::parse<FloatType, 3>(*originValue).value_or(vm::vec3::zero())
                 : vm::vec3::zero();
   m_cachedProperties.rotation = entityRotation(*this);
+  m_cachedProperties.rotationOffset = entityRotation(*this, true);
 
   if (
     const auto* pointDefinition =
@@ -467,10 +480,17 @@ void Entity::updateCachedProperties(const EntityPropertyConfig& propertyConfig)
       propertyConfig.defaultModelScaleExpression);
     m_cachedProperties.modelTransformation =
       vm::translation_matrix(origin()) * rotation() * vm::scaling_matrix(scale);
+
+    m_cachedProperties.modelTransformationOffset =
+        vm::translation_matrix(origin()) * rotationEx() * vm::scaling_matrix(scale);
+
+    m_cachedProperties.modelTransformationOffset = m_cachedProperties.modelTransformationOffset;
+
   }
   else
   {
     m_cachedProperties.modelTransformation = vm::mat4x4::identity();
+    m_cachedProperties.modelTransformationOffset = vm::mat4x4::identity();
   }
 }
 

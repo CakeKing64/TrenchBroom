@@ -77,7 +77,11 @@ EntityRotationInfo entityRotationInfo(const Entity& entity);
 vm::mat4x4 entityRotation(
   const std::vector<EntityProperty>& properties, const EntityRotationInfo& info);
 
+vm::mat4x4 entityRotation(
+	const std::vector<EntityProperty>& properties, const EntityRotationInfo& info, bool rotate);
+
 vm::mat4x4 entityRotation(const Entity& entity);
+vm::mat4x4 entityRotation(const Entity& entity, bool rotate);
 
 vm::vec3 entityYawPitchRoll(const vm::mat4x4& transformation, const vm::mat4x4& rotation);
 

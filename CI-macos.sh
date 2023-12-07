@@ -56,7 +56,12 @@ fi
 
 cd "$BUILD_DIR"
 
-cpack || exit 1
+# see https://github.com/actions/runner-images/issues/7522
+echo killing...; sudo pkill -9 XProtect >/dev/null || true;
+echo waiting...; while pgrep XProtect; do sleep 3; done;
+
+# retry up to 3 times to work around hdiutil failing to create a DMG image
+retry --tries=3 --fail="exit 1" cpack
 ./app/generate_checksum.sh
 
 echo "Deployment target (minos):"

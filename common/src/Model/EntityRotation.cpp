@@ -273,7 +273,7 @@ vm::mat4x4 entityRotation(
     // z = roll
     const auto roll = +vm::to_radians(angles.z());
     const auto pitch = +vm::to_radians(angles.x());
-    const auto yaw = +vm::to_radians(angles.y() + (rotate ? 90 : 0));
+    const auto yaw = +vm::to_radians(angles.y() - (rotate ? 90 : 0));
     return vm::rotation_matrix(roll, pitch, yaw);
   }
   case EntityRotationType::Mangle: {

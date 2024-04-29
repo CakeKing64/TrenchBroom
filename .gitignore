@@ -5,6 +5,7 @@ Thumbs.db
 .vscode
 .cache
 
+cmakebuild
 /cmake-build-*
 /build*
 /codeblocks

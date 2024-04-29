@@ -92,7 +92,6 @@ private:
     const std::string& str,
     MapFormat mapFormat,
     const vm::bbox3& worldBounds,
-    const std::vector<std::string>& linkedGroupsToKeep,
     Logger& logger) const override;
   std::vector<BrushFace> doParseBrushFaces(
     const std::string& str,
@@ -135,8 +134,9 @@ private:
   const BrushFaceAttributes& doDefaultFaceAttribs() const override;
   const std::vector<CompilationTool>& doCompilationTools() const override;
 
-  Result<std::vector<Assets::EntityDefinition*>> doLoadEntityDefinitions(
+  Result<std::vector<std::unique_ptr<Assets::EntityDefinition>>> loadEntityDefinitions(
     IO::ParserStatus& status, const std::filesystem::path& path) const override;
+
   std::unique_ptr<Assets::EntityModel> doInitializeModel(
     const std::filesystem::path& path, Logger& logger) const override;
   void doLoadFrame(

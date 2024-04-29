@@ -31,9 +31,9 @@
 #include "Result.h"
 #include "View/CachingLogger.h"
 
-#include <vecmath/bbox.h>
-#include <vecmath/forward.h>
-#include <vecmath/util.h>
+#include "vm/bbox.h"
+#include "vm/forward.h"
+#include "vm/util.h"
 
 #include <filesystem>
 #include <map>
@@ -702,10 +702,17 @@ public: // asset management
   void setEntityDefinitionFile(const Assets::EntityDefinitionFileSpec& spec);
 
   // For testing
-  void setEntityDefinitions(const std::vector<Assets::EntityDefinition*>& definitions);
+  void setEntityDefinitions(
+    std::vector<std::unique_ptr<Assets::EntityDefinition>> definitions);
 
   void reloadTextureCollections();
   void reloadEntityDefinitions();
+
+  std::vector<std::filesystem::path> enabledTextureCollections() const;
+  std::vector<std::filesystem::path> disabledTextureCollections() const;
+
+  void setEnabledTextureCollections(
+    const std::vector<std::filesystem::path>& enabledTextureCollections);
 
 private:
   void loadAssets();
@@ -823,6 +830,7 @@ public:
 
 private:
   MapDocument& m_document;
+  std::string m_name;
   State m_state;
 
 public:
@@ -833,11 +841,12 @@ public:
 
   State state() const;
 
+  void finish(bool commit);
   bool commit();
   void rollback();
   void cancel();
 
 private:
-  void begin(std::string name);
+  void begin();
 };
 } // namespace TrenchBroom::View

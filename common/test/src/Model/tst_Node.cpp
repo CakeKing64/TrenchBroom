@@ -39,17 +39,17 @@
 #include "Model/PickResult.h"
 #include "Model/WorldNode.h"
 
-#include <kdl/overload.h>
-#include <kdl/result.h>
-#include <kdl/vector_utils.h>
+#include "kdl/overload.h"
+#include "kdl/result.h"
+#include "kdl/vector_utils.h"
 
-#include <vecmath/bbox.h>
-#include <vecmath/bbox_io.h>
-#include <vecmath/mat.h>
-#include <vecmath/mat_ext.h>
-#include <vecmath/mat_io.h>
-#include <vecmath/ray.h>
-#include <vecmath/ray_io.h>
+#include "vm/bbox.h"
+#include "vm/bbox_io.h"
+#include "vm/mat.h"
+#include "vm/mat_ext.h"
+#include "vm/mat_io.h"
+#include "vm/ray.h"
+#include "vm/ray_io.h"
 
 #include <variant>
 #include <vector>
@@ -123,7 +123,7 @@ private:
   }
 
 private: // implement Node interface
-  Node* doClone(const vm::bbox3& /* worldBounds */) const override
+  Node* doClone(const vm::bbox3& /* worldBounds */, const SetLinkId) const override
   {
     return new MockNode();
   }
@@ -200,7 +200,7 @@ private: // implement Node interface
 class TestNode : public Node
 {
 private: // implement Node interface
-  Node* doClone(const vm::bbox3& /* worldBounds */) const override
+  Node* doClone(const vm::bbox3& /* worldBounds */, const SetLinkId) const override
   {
     return new TestNode();
   }

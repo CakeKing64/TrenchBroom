@@ -27,20 +27,20 @@
 #include "Model/EntityPropertiesVariableStore.h"
 #include "Model/EntityRotation.h"
 
-#include <kdl/string_utils.h>
-#include <kdl/vector_utils.h>
+#include "kdl/reflection_impl.h"
+#include "kdl/string_utils.h"
+#include "kdl/vector_utils.h"
 
-#include <vecmath/bbox.h>
-#include <vecmath/mat.h>
-#include <vecmath/mat_ext.h>
-#include <vecmath/vec.h>
-#include <vecmath/vec_io.h>
+#include "vm/bbox.h"
+#include "vm/mat.h"
+#include "vm/mat_ext.h"
+#include "vm/vec.h"
+#include "vm/vec_io.h"
 
 #include <algorithm>
 
-namespace TrenchBroom
-{
-namespace Model
+
+namespace TrenchBroom::Model
 {
 
 void setDefaultProperties(
@@ -68,21 +68,19 @@ void setDefaultProperties(
   }
 }
 
+kdl_reflect_impl(Entity);
+
 const vm::bbox3 Entity::DefaultBounds = vm::bbox3{8.0};
 
 Entity::Entity()
-  : m_pointEntity{true}
-  , m_model{nullptr}
-  , m_cachedProperties{
-      EntityPropertyValues::NoClassname, vm::vec3{}, vm::mat4x4{}, vm::mat4x4{}}
+  : m_cachedProperties{
+    EntityPropertyValues::NoClassname, vm::vec3{}, vm::mat4x4{}, vm::mat4x4{}}
 {
 }
 
 Entity::Entity(
   const EntityPropertyConfig& propertyConfig, std::vector<EntityProperty> properties)
   : m_properties{std::move(properties)}
-  , m_pointEntity{true}
-  , m_model{nullptr}
 {
   updateCachedProperties(propertyConfig);
 }
@@ -91,8 +89,6 @@ Entity::Entity(
   const EntityPropertyConfig& propertyConfig,
   std::initializer_list<EntityProperty> properties)
   : m_properties{std::move(properties)}
-  , m_pointEntity{true}
-  , m_model{nullptr}
 {
   updateCachedProperties(propertyConfig);
 }
@@ -455,6 +451,25 @@ void Entity::applyRotation(
   }
 }
 
+namespace
+{
+auto parseOrigin(const std::string* str)
+{
+  if (!str)
+  {
+    return vm::vec3::zero();
+  }
+
+  const auto parsed = vm::parse<FloatType, 3>(*str);
+  if (!parsed || vm::is_nan(*parsed))
+  {
+    return vm::vec3::zero();
+  }
+
+  return *parsed;
+}
+} // namespace
+
 void Entity::updateCachedProperties(const EntityPropertyConfig& propertyConfig)
 {
   const auto* classnameValue = property(EntityPropertyKeys::Classname);
@@ -463,9 +478,7 @@ void Entity::updateCachedProperties(const EntityPropertyConfig& propertyConfig)
   // order is important here because EntityRotation::getRotation accesses classname
   m_cachedProperties.classname =
     classnameValue ? *classnameValue : EntityPropertyValues::NoClassname;
-  m_cachedProperties.origin =
-    originValue ? vm::parse<FloatType, 3>(*originValue).value_or(vm::vec3::zero())
-                : vm::vec3::zero();
+  m_cachedProperties.origin = parseOrigin(originValue);
   m_cachedProperties.rotation = entityRotation(*this);
   m_cachedProperties.rotationOffset = entityRotation(*this, true);
 
@@ -494,14 +507,4 @@ void Entity::updateCachedProperties(const EntityPropertyConfig& propertyConfig)
   }
 }
 
-bool operator==(const Entity& lhs, const Entity& rhs)
-{
-  return lhs.properties() == rhs.properties();
-}
-
-bool operator!=(const Entity& lhs, const Entity& rhs)
-{
-  return !(lhs == rhs);
-}
-} // namespace Model
-} // namespace TrenchBroom
+} // namespace TrenchBroom::Model

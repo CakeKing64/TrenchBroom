@@ -25,9 +25,9 @@
 #include "Renderer/GLVertexType.h"
 #include "View/CellView.h"
 
-#include <vecmath/bbox.h>
-#include <vecmath/forward.h>
-#include <vecmath/quat.h>
+#include "vm/bbox.h"
+#include "vm/forward.h"
+#include "vm/quat.h"
 
 #include <optional>
 #include <string>
@@ -141,11 +141,6 @@ private:
   class MeshFunc;
   void renderModels(
     Layout& layout, float y, float height, Renderer::Transformation& transformation);
-
-  void renderNames(Layout& layout, float y, float height, const vm::mat4x4f& projection);
-  void renderGroupTitleBackgrounds(Layout& layout, float y, float height);
-  void renderStrings(Layout& layout, float y, float height);
-  StringMap collectStringVertices(Layout& layout, float y, float height);
 
   vm::mat4x4f itemTransformation(
     const Cell& cell, float y, float height, bool applyModelScale) const;

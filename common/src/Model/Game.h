@@ -27,8 +27,8 @@
 #include "Model/MapFormat.h"
 #include "Result.h"
 
-#include <vecmath/bbox.h>
-#include <vecmath/forward.h>
+#include "vm/bbox.h"
+#include "vm/forward.h"
 
 #include <filesystem>
 #include <map>
@@ -121,7 +121,6 @@ public: // parsing and serializing objects
     const std::string& str,
     MapFormat mapFormat,
     const vm::bbox3& worldBounds,
-    const std::vector<std::string>& linkedGroupsToKeep,
     Logger& logger) const;
   std::vector<BrushFace> parseBrushFaces(
     const std::string& str,
@@ -198,7 +197,6 @@ private: // subclassing interface
     const std::string& str,
     MapFormat mapFormat,
     const vm::bbox3& worldBounds,
-    const std::vector<std::string>& linkedGroupsToKeep,
     Logger& logger) const = 0;
   virtual std::vector<BrushFace> doParseBrushFaces(
     const std::string& str,

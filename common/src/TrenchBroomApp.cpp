@@ -64,9 +64,9 @@
 #include <QTimer>
 #include <QUrl>
 
-#include <kdl/path_utils.h>
-#include <kdl/set_temp.h>
-#include <kdl/string_utils.h>
+#include "kdl/path_utils.h"
+#include "kdl/set_temp.h"
+#include "kdl/string_utils.h"
 
 #include <fmt/format.h>
 
@@ -334,7 +334,7 @@ void TrenchBroomApp::loadStyle()
   }
 }
 
-const std::vector<std::filesystem::path>& TrenchBroomApp::recentDocuments() const
+std::vector<std::filesystem::path> TrenchBroomApp::recentDocuments() const
 {
   return m_recentDocuments->recentDocuments();
 }
@@ -599,21 +599,16 @@ bool TrenchBroomApp::event(QEvent* event)
 
 void TrenchBroomApp::openFilesOrWelcomeFrame(const QStringList& fileNames)
 {
+  const auto filesToOpen =
+    useSDI() && !fileNames.empty() ? QStringList{fileNames.front()} : fileNames;
+
   auto anyDocumentOpened = false;
-  if (useSDI())
+  for (const auto& fileName : filesToOpen)
   {
-    if (fileNames.length() > 0)
+    const auto path = IO::pathFromQString(fileName);
+    if (!path.empty() && openDocument(path))
     {
-      const auto path = IO::pathFromQString(fileNames.at(0));
-      anyDocumentOpened = !path.empty() && openDocument(path);
-    }
-  }
-  else
-  {
-    for (const auto& fileName : fileNames)
-    {
-      const auto path = IO::pathFromQString(fileName);
-      anyDocumentOpened = anyDocumentOpened | (!path.empty() && openDocument(path));
+      anyDocumentOpened = true;
     }
   }
 

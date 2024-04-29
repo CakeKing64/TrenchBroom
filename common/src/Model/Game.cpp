@@ -26,7 +26,7 @@
 #include "Model/GameFactory.h"
 #include "Model/WorldNode.h"
 
-#include <kdl/result.h>
+#include "kdl/result.h"
 
 #include <string>
 #include <vector>
@@ -120,10 +120,9 @@ std::vector<Node*> Game::parseNodes(
   const std::string& str,
   const MapFormat mapFormat,
   const vm::bbox3& worldBounds,
-  const std::vector<std::string>& linkedGroupsToKeep,
   Logger& logger) const
 {
-  return doParseNodes(str, mapFormat, worldBounds, linkedGroupsToKeep, logger);
+  return doParseNodes(str, mapFormat, worldBounds, logger);
 }
 
 std::vector<BrushFace> Game::parseBrushFaces(

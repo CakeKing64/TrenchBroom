@@ -22,24 +22,23 @@
 #include "Assets/AssetReference.h"
 #include "FloatType.h"
 
-#include <kdl/reflection_decl.h>
+#include "kdl/reflection_decl.h"
 
-#include <vecmath/bbox.h>
-#include <vecmath/forward.h>
-#include <vecmath/vec.h>
+#include "vm/bbox.h"
+#include "vm/forward.h"
+#include "vm/vec.h"
 
 #include <string>
 #include <vector>
 
-namespace TrenchBroom
-{
-namespace Assets
+namespace TrenchBroom::Assets
 {
 class Texture;
 }
 
-namespace Model
+namespace TrenchBroom::Model
 {
+
 class BezierPatch
 {
 public:
@@ -53,6 +52,14 @@ private:
 
   std::string m_textureName;
   Assets::AssetReference<Assets::Texture> m_textureReference;
+
+  kdl_reflect_decl(
+    BezierPatch,
+    m_pointRowCount,
+    m_pointColumnCount,
+    m_bounds,
+    m_controlPoints,
+    m_textureName);
 
 public:
   BezierPatch(
@@ -68,6 +75,7 @@ public:
   BezierPatch& operator=(const BezierPatch& other);
   BezierPatch& operator=(BezierPatch&& other) noexcept;
 
+public: // control points:
   size_t pointRowCount() const;
   size_t pointColumnCount() const;
 
@@ -92,15 +100,6 @@ public:
   void transform(const vm::mat4x4& transformation);
 
   std::vector<Point> evaluate(size_t subdivisionsPerSurface) const;
-
-  kdl_reflect_decl(
-    BezierPatch,
-    m_pointRowCount,
-    m_pointColumnCount,
-    m_bounds,
-    m_controlPoints,
-    m_textureName);
 };
 
-} // namespace Model
-} // namespace TrenchBroom
+} // namespace TrenchBroom::Model

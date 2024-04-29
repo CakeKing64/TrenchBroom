@@ -24,7 +24,9 @@
 #include "Model/BrushGeometry.h"
 #include "Result.h"
 
-#include <vecmath/forward.h>
+#include "kdl/reflection_decl.h"
+
+#include "vm/forward.h"
 
 #include <memory>
 #include <optional>
@@ -56,21 +58,23 @@ private:
   std::vector<BrushFace> m_faces;
   std::unique_ptr<BrushGeometry> m_geometry;
 
+  kdl_reflect_decl(Brush, m_faces);
+
 public:
   Brush();
 
   Brush(const Brush& other);
   Brush(Brush&& other) noexcept;
-  Brush& operator=(Brush other) noexcept;
 
-  friend void swap(Brush& lhs, Brush& rhs) noexcept;
+  Brush& operator=(const Brush& other);
+  Brush& operator=(Brush&& other) noexcept;
 
   ~Brush();
 
   static Result<Brush> create(const vm::bbox3& worldBounds, std::vector<BrushFace> faces);
 
 private:
-  Brush(std::vector<BrushFace> faces);
+  explicit Brush(std::vector<BrushFace> faces);
 
   Result<void> updateGeometryFromFaces(const vm::bbox3& worldBounds);
 
@@ -240,10 +244,9 @@ private:
    * @param matcher a polyhedron matcher which is used to identify related vertices
    * @param left the face of the left polyhedron
    * @param right the face of the right polyhedron
-   * @return {true, transform} if a transform could be found, otherwise {false,
-   * unspecified}
+   * @return the transformation matrix or nullopt if it cannot be found
    */
-  static std::tuple<bool, vm::mat4x4> findTransformForUVLock(
+  static std::optional<vm::mat4x4> findTransformForUVLock(
     const PolyhedronMatcher<BrushGeometry>& matcher,
     BrushFaceGeometry* left,
     BrushFaceGeometry* right);

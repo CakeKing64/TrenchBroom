@@ -32,11 +32,11 @@
 #include "Model/ValidatorRegistry.h"
 #include "octree.h"
 
-#include <kdl/overload.h>
-#include <kdl/result.h>
-#include <kdl/vector_utils.h>
+#include "kdl/overload.h"
+#include "kdl/result.h"
+#include "kdl/vector_utils.h"
 
-#include <vecmath/bbox_io.h>
+#include "vm/bbox_io.h"
 
 #include <sstream>
 #include <string>
@@ -281,7 +281,8 @@ FloatType WorldNode::doGetProjectedArea(const vm::axis::type) const
   return static_cast<FloatType>(0);
 }
 
-Node* WorldNode::doClone(const vm::bbox3& /* worldBounds */) const
+Node* WorldNode::doClone(
+  const vm::bbox3& /* worldBounds */, const SetLinkId /* setLinkIds */) const
 {
   auto worldNode =
     std::make_unique<WorldNode>(entityPropertyConfig(), entity(), mapFormat());
@@ -289,14 +290,15 @@ Node* WorldNode::doClone(const vm::bbox3& /* worldBounds */) const
   return worldNode.release();
 }
 
-Node* WorldNode::doCloneRecursively(const vm::bbox3& worldBounds) const
+Node* WorldNode::doCloneRecursively(
+  const vm::bbox3& worldBounds, const SetLinkId setLinkIds) const
 {
   const auto& myChildren = children();
   assert(myChildren[0] == m_defaultLayer);
 
-  auto* worldNode = static_cast<WorldNode*>(clone(worldBounds));
+  auto* worldNode = static_cast<WorldNode*>(clone(worldBounds, setLinkIds));
   worldNode->defaultLayer()->addChildren(
-    cloneRecursively(worldBounds, m_defaultLayer->children()));
+    cloneRecursively(worldBounds, m_defaultLayer->children(), setLinkIds));
 
   if (myChildren.size() > 1)
   {
@@ -304,6 +306,7 @@ Node* WorldNode::doCloneRecursively(const vm::bbox3& worldBounds) const
     childClones.reserve(myChildren.size() - 1);
     cloneRecursively(
       worldBounds,
+      setLinkIds,
       std::next(std::begin(myChildren)),
       std::end(myChildren),
       std::back_inserter(childClones));

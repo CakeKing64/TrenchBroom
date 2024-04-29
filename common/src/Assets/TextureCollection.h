@@ -22,7 +22,7 @@
 #include "Assets/Texture.h"
 #include "Renderer/GL.h"
 
-#include <kdl/reflection_decl.h>
+#include "kdl/reflection_decl.h"
 
 #include <filesystem>
 #include <string>
@@ -62,7 +62,6 @@ public:
 
   bool loaded() const;
   const std::filesystem::path& path() const;
-  std::string name() const;
   size_t textureCount() const;
 
   const std::vector<Texture>& textures() const;

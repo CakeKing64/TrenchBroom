@@ -33,19 +33,22 @@
 #include "Model/ParallelTexCoordSystem.h"
 #include "Model/ParaxialTexCoordSystem.h"
 #include "Model/PatchNode.h"
+#include "Model/WorldNode.h"
 #include "TestLogger.h"
 #include "View/MapDocument.h"
 #include "View/MapDocumentCommandFacade.h"
 
-#include <kdl/result.h>
-#include <kdl/string_compare.h>
+#include "kdl/result.h"
+#include "kdl/string_compare.h"
 
-#include <vecmath/polygon.h>
-#include <vecmath/scalar.h>
-#include <vecmath/segment.h>
+#include "vm/polygon.h"
+#include "vm/scalar.h"
+#include "vm/segment.h"
 
 #include <sstream>
 #include <string>
+
+#include "Catch2.h"
 
 namespace TrenchBroom
 {
@@ -379,11 +382,12 @@ void checkBrushTexCoordSystem(
   checkFaceTexCoordSystem(faces[5], expectParallel);
 }
 
-void setLinkedGroupId(GroupNode& groupNode, std::string linkedGroupId)
+void setLinkId(Node& node, std::string linkId)
 {
-  auto group = groupNode.group();
-  group.setLinkedGroupId(std::move(linkedGroupId));
-  groupNode.setGroup(std::move(group));
+  node.accept(kdl::overload(
+    [](const WorldNode*) {},
+    [](const LayerNode*) {},
+    [&](Object* object) { object->setLinkId(std::move(linkId)); }));
 }
 } // namespace Model
 
@@ -510,45 +514,5 @@ void checkColor(
     CHECK(b == actualB);
     CHECK(a == actualA);
   }
-}
-
-// GlobMatcher
-
-GlobMatcher::GlobMatcher(const std::string& glob)
-  : m_glob(glob)
-{
-}
-
-bool GlobMatcher::match(const std::string& value) const
-{
-  return kdl::cs::str_matches_glob(value, m_glob);
-}
-
-std::string GlobMatcher::describe() const
-{
-  std::stringstream ss;
-  ss << "matches glob \"" << m_glob << "\"";
-  return ss.str();
-}
-
-GlobMatcher MatchesGlob(const std::string& glob)
-{
-  return GlobMatcher(glob);
-}
-
-TEST_CASE("TestUtilsTest.testUnorderedApproxVecMatcher")
-{
-  using V = std::vector<vm::vec3>;
-  CHECK_THAT((V{{1, 1, 1}}), UnorderedApproxVecMatches(V{{1.01, 1.01, 1.01}}, 0.02));
-  CHECK_THAT(
-    (V{{0, 0, 0}, {1, 1, 1}}),
-    UnorderedApproxVecMatches(V{{1.01, 1.01, 1.01}, {-0.01, -0.01, -0.01}}, 0.02));
-
-  CHECK_THAT(
-    (V{{1, 1, 1}}),
-    !UnorderedApproxVecMatches(
-      V{{1.01, 1.01, 1.01}, {1, 1, 1}}, 0.02)); // different number of elements
-  CHECK_THAT(
-    (V{{1, 1, 1}}), !UnorderedApproxVecMatches(V{{1.05, 1.01, 1.01}}, 0.02)); // too far
 }
 } // namespace TrenchBroom

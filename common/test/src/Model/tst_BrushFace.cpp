@@ -37,14 +37,14 @@
 #include "Model/Polyhedron.h"
 #include "TestUtils.h"
 
-#include <kdl/result.h>
-#include <kdl/vector_utils.h>
+#include "kdl/result.h"
+#include "kdl/vector_utils.h"
 
-#include <vecmath/approx.h>
-#include <vecmath/forward.h>
-#include <vecmath/mat.h>
-#include <vecmath/mat_ext.h>
-#include <vecmath/vec.h>
+#include "vm/approx.h"
+#include "vm/forward.h"
+#include "vm/mat.h"
+#include "vm/mat_ext.h"
+#include "vm/vec.h"
 
 #include <memory>
 #include <vector>
@@ -650,7 +650,7 @@ TEST_CASE("BrushFaceTest.testValveRotation")
 
   IO::TestParserStatus status;
   std::vector<Node*> nodes =
-    IO::NodeReader::read(data, MapFormat::Valve, worldBounds, {}, {}, status);
+    IO::NodeReader::read(data, MapFormat::Valve, worldBounds, {}, status);
   BrushNode* pyramidLight = dynamic_cast<BrushNode*>(nodes.at(0)->children().at(0));
   REQUIRE(pyramidLight != nullptr);
 
@@ -719,7 +719,7 @@ TEST_CASE("BrushFaceTest.testCopyTexCoordSystem")
   IO::TestParserStatus status;
 
   std::vector<Node*> nodes =
-    IO::NodeReader::read(data, MapFormat::Valve, worldBounds, {}, {}, status);
+    IO::NodeReader::read(data, MapFormat::Valve, worldBounds, {}, status);
   BrushNode* pyramidLight = dynamic_cast<BrushNode*>(nodes.at(0)->children().at(0));
   REQUIRE(pyramidLight != nullptr);
 
@@ -793,7 +793,7 @@ TEST_CASE("BrushFaceTest.move45DegreeFace")
   IO::TestParserStatus status;
 
   std::vector<Node*> nodes =
-    IO::NodeReader::read(data, MapFormat::Valve, worldBounds, {}, {}, status);
+    IO::NodeReader::read(data, MapFormat::Valve, worldBounds, {}, status);
   BrushNode* brushNode = dynamic_cast<BrushNode*>(nodes.at(0)->children().at(0));
   CHECK(brushNode != nullptr);
 
@@ -883,7 +883,7 @@ TEST_CASE("BrushFaceTest.flipTexture")
   IO::TestParserStatus status;
 
   std::vector<Node*> nodes =
-    IO::NodeReader::read(data, MapFormat::Valve, worldBounds, {}, {}, status);
+    IO::NodeReader::read(data, MapFormat::Valve, worldBounds, {}, status);
   auto* brushNode = dynamic_cast<BrushNode*>(nodes.at(0)->children().at(0));
   REQUIRE(brushNode != nullptr);
 

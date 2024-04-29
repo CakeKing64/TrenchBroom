@@ -93,12 +93,12 @@
 #include "View/VertexTool.h"
 #include "View/ViewUtils.h"
 
-#include <kdl/overload.h>
-#include <kdl/string_format.h>
-#include <kdl/string_utils.h>
+#include "kdl/overload.h"
+#include "kdl/string_format.h"
+#include "kdl/string_utils.h"
 
-#include <vecmath/vec.h>
-#include <vecmath/vec_io.h>
+#include "vm/vec.h"
+#include "vm/vec_io.h"
 
 #include <cassert>
 #include <chrono>
@@ -366,11 +366,11 @@ void MapFrame::createGui()
   setWindowIconTB(this);
   setWindowTitle("TrenchBroom");
 
-  m_hSplitter = new Splitter(Qt::Horizontal);
+  m_hSplitter = new Splitter(Qt::Horizontal, DrawKnob::No);
   m_hSplitter->setChildrenCollapsible(false);
   m_hSplitter->setObjectName("MapFrame_HorizontalSplitter");
 
-  m_vSplitter = new Splitter(Qt::Vertical);
+  m_vSplitter = new Splitter(Qt::Vertical, DrawKnob::No);
   m_vSplitter->setChildrenCollapsible(false);
   m_vSplitter->setObjectName("MapFrame_VerticalSplitterSplitter");
 
@@ -669,7 +669,7 @@ static QString describeSelection(const MapDocument* document)
 
   // get the layers of the selected nodes
   const std::vector<Model::LayerNode*> selectedObjectLayers =
-    Model::findContainingLayersUserSorted(selectedNodes.nodes());
+    Model::collectContainingLayersUserSorted(selectedNodes.nodes());
   QString layersDescription;
   if (selectedObjectLayers.size() == 1)
   {
@@ -1416,26 +1416,38 @@ void MapFrame::pasteAtCursorPosition()
   if (canPaste())
   {
     const auto referenceBounds = m_document->referenceBounds();
-    if (paste() == PasteType::Node && m_document->hasSelectedNodes())
+
+    auto transaction = Transaction{m_document, "Paste"};
+    switch (paste())
     {
-      const auto bounds = m_document->selectionBounds();
-
-      // The pasted objects must be hidden to prevent the picking done in
-      // pasteObjectsDelta from hitting them
-      // (https://github.com/TrenchBroom/TrenchBroom/issues/2755)
-      const auto nodes = m_document->selectedNodes().nodes();
-
-      auto transaction = Transaction{m_document};
-      m_document->hide(nodes);
-      const auto delta = m_mapView->pasteObjectsDelta(bounds, referenceBounds);
-      m_document->show(nodes);
-      m_document->selectNodes(nodes); // Hiding deselected the nodes, so reselect them
-      if (!m_document->translateObjects(delta))
+    case PasteType::Node:
+      if (m_document->hasSelectedNodes())
       {
-        transaction.cancel();
-        return;
+        const auto bounds = m_document->selectionBounds();
+
+        // The pasted objects must be hidden to prevent the picking done in
+        // pasteObjectsDelta from hitting them
+        // (https://github.com/TrenchBroom/TrenchBroom/issues/2755)
+        const auto nodes = m_document->selectedNodes().nodes();
+
+        m_document->hide(nodes);
+        const auto delta = m_mapView->pasteObjectsDelta(bounds, referenceBounds);
+        m_document->show(nodes);
+        m_document->selectNodes(nodes); // Hiding deselected the nodes, so reselect them
+        if (!m_document->translateObjects(delta))
+        {
+          transaction.cancel();
+          break;
+        }
       }
       transaction.commit();
+      break;
+    case PasteType::BrushFace:
+      transaction.commit();
+      break;
+    case PasteType::Failed:
+      transaction.cancel();
+      break;
     }
   }
 }

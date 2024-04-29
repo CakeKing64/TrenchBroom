@@ -26,10 +26,11 @@
 #include "IO/ImageLoaderImpl.h"
 #include "IO/Reader.h"
 
+#include "kdl/invoke.h"
+#include "kdl/resource.h"
+#include "kdl/result.h"
 #include "kdl/string_utils.h"
 #include "kdl/vector_utils.h"
-#include <kdl/invoke.h>
-#include <kdl/result.h>
 
 #include <fmt/format.h>
 
@@ -73,16 +74,26 @@ Color getAverageColor(const Assets::TextureBuffer& buffer, const GLenum format)
 {
   ensure(format == GL_RGBA || format == GL_BGRA, "format is GL_RGBA or GL_BGRA");
 
+  const auto r = size_t(format == GL_RGBA ? 0 : 2);
+  const auto g = size_t(format == GL_RGBA ? 1 : 1);
+  const auto b = size_t(format == GL_RGBA ? 2 : 0);
+  const auto a = size_t(3);
+
   const auto* const data = buffer.data();
   const auto bufferSize = buffer.size();
+  const auto numPixels = bufferSize / 4;
+
+  const auto stride = numPixels <= 4192 ? 1 : numPixels / 64;
+  const auto numSamples = numPixels / stride;
 
   auto average = Color{};
-  for (std::size_t i = 0; i < bufferSize; i += 4)
+  for (std::size_t i = 0; i < numSamples; ++i)
   {
-    average = average + Color{data[i], data[i + 1], data[i + 2], data[i + 3]};
+    const auto pixel = i * 4 * stride;
+    average =
+      average + Color{data[pixel + r], data[pixel + g], data[pixel + b], data[pixel + a]};
   }
-  const auto numPixels = bufferSize / 4;
-  average = average / static_cast<float>(numPixels);
+  average = average / static_cast<float>(numSamples);
 
   return average;
 }
@@ -94,21 +105,21 @@ Result<Assets::Texture, ReadTextureError> readFreeImageTextureFromMemory(
   {
     InitFreeImage::initialize();
 
-    auto* imageMemory =
-      FreeImage_OpenMemory(const_cast<uint8_t*>(begin), static_cast<DWORD>(size));
-    auto memoryGuard = kdl::invoke_later{[&]() { FreeImage_CloseMemory(imageMemory); }};
+    auto imageMemory = kdl::resource{
+      FreeImage_OpenMemory(const_cast<uint8_t*>(begin), static_cast<DWORD>(size)),
+      FreeImage_CloseMemory};
 
-    const auto imageFormat = FreeImage_GetFileTypeFromMemory(imageMemory);
-    auto* image = FreeImage_LoadFromMemory(imageFormat, imageMemory);
-    auto imageGuard = kdl::invoke_later{[&]() { FreeImage_Unload(image); }};
+    const auto imageFormat = FreeImage_GetFileTypeFromMemory(*imageMemory);
+    auto image = kdl::resource{
+      FreeImage_LoadFromMemory(imageFormat, *imageMemory), FreeImage_Unload};
 
     if (!image)
     {
       return ReadTextureError{std::move(name), "FreeImage could not load image data"};
     }
 
-    const auto imageWidth = size_t(FreeImage_GetWidth(image));
-    const auto imageHeight = size_t(FreeImage_GetHeight(image));
+    const auto imageWidth = size_t(FreeImage_GetWidth(*image));
+    const auto imageHeight = size_t(FreeImage_GetHeight(*image));
 
     if (!checkTextureDimensions(imageWidth, imageHeight))
     {
@@ -118,7 +129,7 @@ Result<Assets::Texture, ReadTextureError> readFreeImageTextureFromMemory(
     }
 
     // This is supposed to indicate whether any pixels are transparent (alpha < 100%)
-    const auto masked = FreeImage_IsTransparent(image);
+    const auto masked = FreeImage_IsTransparent(*image);
 
     constexpr auto mipCount = 1u;
     constexpr auto format = freeImage32BPPFormatToGLFormat();
@@ -127,10 +138,10 @@ Result<Assets::Texture, ReadTextureError> readFreeImageTextureFromMemory(
     Assets::setMipBufferSize(buffers, mipCount, imageWidth, imageHeight, format);
 
     if (
-      FreeImage_GetColorType(image) != FIC_RGBALPHA
-      || FreeImage_GetLine(image) / FreeImage_GetWidth(image) != 4)
+      FreeImage_GetColorType(*image) != FIC_RGBALPHA
+      || FreeImage_GetLine(*image) / FreeImage_GetWidth(*image) != 4)
     {
-      FreeImage_Unload(std::exchange(image, FreeImage_ConvertTo32Bits(image)));
+      image = FreeImage_ConvertTo32Bits(*image);
     }
 
     if (!image)
@@ -138,14 +149,14 @@ Result<Assets::Texture, ReadTextureError> readFreeImageTextureFromMemory(
       return ReadTextureError{std::move(name), "Unsupported pixel format"};
     }
 
-    assert(FreeImage_GetLine(image) / FreeImage_GetWidth(image) == 4);
+    assert(FreeImage_GetLine(*image) / FreeImage_GetWidth(*image) == 4);
 
     auto* outBytes = buffers.at(0).data();
     const auto outBytesPerRow = int(imageWidth * 4);
 
     FreeImage_ConvertToRawBits(
       outBytes,
-      image,
+      *image,
       outBytesPerRow,
       32,
       FI_RGBA_RED_MASK,
@@ -213,6 +224,8 @@ std::vector<std::string> getSupportedFreeImageExtensions()
 
 bool isSupportedFreeImageExtension(const std::string& extension)
 {
+  InitFreeImage::initialize();
+
   static const auto extensions = getSupportedFreeImageExtensions();
   return kdl::vec_contains(extensions, kdl::str_to_lower(extension));
 }

@@ -22,9 +22,9 @@
 #include "EL/Expression.h"
 #include "FloatType.h"
 
-#include <kdl/reflection_decl.h>
+#include "kdl/reflection_decl.h"
 
-#include <vecmath/vec.h>
+#include "vm/vec.h"
 
 #include <filesystem>
 #include <iosfwd>
@@ -64,9 +64,10 @@ private:
 public:
   ModelDefinition();
   ModelDefinition(size_t line, size_t column);
-  explicit ModelDefinition(const EL::Expression& expression);
 
-  void append(const ModelDefinition& other);
+  explicit ModelDefinition(EL::Expression expression);
+
+  void append(ModelDefinition other);
 
   /**
    * Evaluates the model expresion, using the given variable store to interpolate

@@ -22,27 +22,31 @@
 #include "Assets/Texture.h"
 #include "Ensure.h"
 
-#include <kdl/reflection_impl.h>
+#include "kdl/reflection_impl.h"
 
-#include <vecmath/bbox_io.h>
-#include <vecmath/bezier_surface.h>
-#include <vecmath/vec_io.h>
+#include "vm/bbox_io.h"
+#include "vm/bezier_surface.h"
+#include "vm/vec_io.h"
 
 #include <cassert>
 
-namespace TrenchBroom
+namespace TrenchBroom::Model
 {
-namespace Model
+
+kdl_reflect_impl(BezierPatch);
+
+namespace
 {
-static vm::bbox3 computeBounds(const std::vector<BezierPatch::Point>& points)
+vm::bbox3 computeBounds(const std::vector<BezierPatch::Point>& points)
 {
-  vm::bbox3::builder builder;
+  auto builder = vm::bbox3::builder{};
   for (const auto& point : points)
   {
     builder.add(point.xyz());
   }
   return builder.bounds();
 }
+} // namespace
 
 BezierPatch::BezierPatch(
   const size_t pointRowCount,
@@ -330,7 +334,4 @@ std::vector<BezierPatch::Point> BezierPatch::evaluate(
   return grid;
 }
 
-kdl_reflect_impl(BezierPatch);
-
-} // namespace Model
-} // namespace TrenchBroom
+} // namespace TrenchBroom::Model

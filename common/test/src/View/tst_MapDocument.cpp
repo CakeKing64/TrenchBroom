@@ -36,9 +36,9 @@
 #include "TestUtils.h"
 #include "View/MapDocumentCommandFacade.h"
 
-#include <kdl/map_utils.h>
-#include <kdl/result.h>
-#include <kdl/vector_utils.h>
+#include "kdl/map_utils.h"
+#include "kdl/result.h"
+#include "kdl/vector_utils.h"
 
 #include <filesystem>
 
@@ -75,8 +75,9 @@ void MapDocumentTest::SetUp()
   m_brushEntityDef = new Assets::BrushEntityDefinition(
     "brush_entity", Color(), "this is a brush entity", {});
 
-  document->setEntityDefinitions(
-    std::vector<Assets::EntityDefinition*>{m_pointEntityDef, m_brushEntityDef});
+  document->setEntityDefinitions(kdl::vec_from(
+    std::unique_ptr<Assets::EntityDefinition>{m_pointEntityDef},
+    std::unique_ptr<Assets::EntityDefinition>{m_brushEntityDef}));
 }
 
 MapDocumentTest::~MapDocumentTest()
@@ -251,7 +252,7 @@ TEST_CASE_METHOD(MapDocumentTest, "Brush Node Selection")
     // clang-format on
 
     const auto nodes = resolvePaths(paths);
-    const auto brushNodes = kdl::vec_element_cast<Model::BrushNode*>(nodes);
+    const auto brushNodes = kdl::vec_static_cast<Model::BrushNode*>(nodes);
 
     document->selectNodes(nodes);
 
@@ -434,13 +435,11 @@ TEST_CASE_METHOD(MapDocumentTest, "selectByLineNumber")
 TEST_CASE_METHOD(MapDocumentTest, "canUpdateLinkedGroups")
 {
   auto* innerGroupNode = new Model::GroupNode{Model::Group{"inner"}};
-  setLinkedGroupId(*innerGroupNode, "asdf");
-
   auto* entityNode = new Model::EntityNode{Model::Entity{}};
   innerGroupNode->addChild(entityNode);
 
   auto* linkedInnerGroupNode = static_cast<Model::GroupNode*>(
-    innerGroupNode->cloneRecursively(document->worldBounds()));
+    innerGroupNode->cloneRecursively(document->worldBounds(), Model::SetLinkId::keep));
 
   auto* linkedEntityNode =
     dynamic_cast<Model::EntityNode*>(linkedInnerGroupNode->children().front());
@@ -461,7 +460,7 @@ TEST_CASE_METHOD(MapDocumentTest, "canUpdateLinkedGroups")
   CHECK(document->canUpdateLinkedGroups({entityNode}));
   CHECK(document->canUpdateLinkedGroups({linkedEntityNode}));
   CHECK_FALSE(
-    document->canUpdateLinkedGroups(kdl::vec_element_cast<Model::Node*>(entityNodes)));
+    document->canUpdateLinkedGroups(kdl::vec_static_cast<Model::Node*>(entityNodes)));
 }
 
 TEST_CASE_METHOD(MapDocumentTest, "createPointEntity")
@@ -500,18 +499,21 @@ TEST_CASE_METHOD(MapDocumentTest, "createPointEntity")
     document->loadDocument(Model::MapFormat::Standard, document->worldBounds(), game, "")
       .transform_error([](auto e) { throw std::runtime_error{e.msg}; });
 
-    auto* definitionWithDefaults = new Assets::PointEntityDefinition{
+    auto definitionWithDefaultsOwner = std::make_unique<Assets::PointEntityDefinition>(
       "some_name",
       Color{},
       vm::bbox3{32.0},
       "",
-      {
+      std::vector<std::shared_ptr<Assets::PropertyDefinition>>{
         std::make_shared<Assets::StringPropertyDefinition>(
           "some_default_prop", "", "", !true(readOnly), "value"),
       },
-      {},
-      {}};
-    document->setEntityDefinitions({definitionWithDefaults});
+      Assets::ModelDefinition{},
+      Assets::DecalDefinition{});
+    auto* definitionWithDefaults = definitionWithDefaultsOwner.get();
+    document->setEntityDefinitions(
+      kdl::vec_from<std::unique_ptr<Assets::EntityDefinition>>(
+        std::move(definitionWithDefaultsOwner)));
 
     auto* entityNode = document->createPointEntity(definitionWithDefaults, {0, 0, 0});
     REQUIRE(entityNode != nullptr);
@@ -573,15 +575,19 @@ TEST_CASE_METHOD(MapDocumentTest, "createBrushEntity")
     document->loadDocument(Model::MapFormat::Standard, document->worldBounds(), game, "")
       .transform_error([](auto e) { throw std::runtime_error{e.msg}; });
 
-    auto* definitionWithDefaults = new Assets::BrushEntityDefinition{
+    auto definitionWithDefaultsOwner = std::make_unique<Assets::BrushEntityDefinition>(
       "some_name",
       Color{},
       "",
-      {
+      std::vector<std::shared_ptr<Assets::PropertyDefinition>>{
         std::make_shared<Assets::StringPropertyDefinition>(
           "some_default_prop", "", "", !true(readOnly), "value"),
-      }};
-    document->setEntityDefinitions({definitionWithDefaults});
+      });
+    auto* definitionWithDefaults = definitionWithDefaultsOwner.get();
+
+    document->setEntityDefinitions(
+      kdl::vec_from<std::unique_ptr<Assets::EntityDefinition>>(
+        std::move(definitionWithDefaultsOwner)));
 
     auto* brushNode = createBrushNode("some_texture");
     document->addNodes({{document->parentForNodes(), {brushNode}}});
@@ -604,12 +610,12 @@ TEST_CASE_METHOD(MapDocumentTest, "resetDefaultProperties")
   document->deleteObjects();
 
   // Note: The test document does not automatically set the default properties
-  auto* definitionWithDefaults = new Assets::PointEntityDefinition{
+  auto definitionWithDefaultsOwner = std::make_unique<Assets::PointEntityDefinition>(
     "some_name",
     Color{},
     vm::bbox3{32.0},
     "",
-    {
+    std::vector<std::shared_ptr<Assets::PropertyDefinition>>{
       std::make_shared<Assets::StringPropertyDefinition>(
         "some_prop", "", "", !true(readOnly)),
       std::make_shared<Assets::StringPropertyDefinition>(
@@ -617,9 +623,12 @@ TEST_CASE_METHOD(MapDocumentTest, "resetDefaultProperties")
       std::make_shared<Assets::StringPropertyDefinition>(
         "default_prop_b", "", "", !true(readOnly), "default_value_b"),
     },
-    {},
-    {}};
-  document->setEntityDefinitions({definitionWithDefaults});
+    Assets::ModelDefinition{},
+    Assets::DecalDefinition{});
+  auto* definitionWithDefaults = definitionWithDefaultsOwner.get();
+
+  document->setEntityDefinitions(kdl::vec_from<std::unique_ptr<Assets::EntityDefinition>>(
+    std::move(definitionWithDefaultsOwner)));
 
   auto* entityNodeWithoutDefinition = new Model::EntityNode{
     document->world()->entityPropertyConfig(),

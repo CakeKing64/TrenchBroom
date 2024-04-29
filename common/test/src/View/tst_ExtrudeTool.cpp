@@ -29,6 +29,7 @@
 #include "Model/Game.h"
 #include "Model/LayerNode.h"
 #include "Model/ModelUtils.h"
+#include "Model/NodeQueries.h"
 #include "Model/PickResult.h"
 #include "Model/WorldNode.h"
 #include "Renderer/PerspectiveCamera.h"
@@ -36,18 +37,20 @@
 #include "TestUtils.h"
 #include "View/ExtrudeTool.h"
 
-#include <kdl/result.h>
-#include <kdl/string_utils.h>
-#include <kdl/vector_utils.h>
+#include "kdl/result.h"
+#include "kdl/string_utils.h"
+#include "kdl/vector_utils.h"
 
-#include <vecmath/approx.h>
-#include <vecmath/ray.h>
-#include <vecmath/scalar.h>
-#include <vecmath/vec.h>
-#include <vecmath/vec_io.h>
+#include "vm/approx.h"
+#include "vm/ray.h"
+#include "vm/scalar.h"
+#include "vm/vec.h"
+#include "vm/vec_io.h"
 
 #include <filesystem>
 #include <memory>
+
+#include "CatchUtils/Matchers.h"
 
 #include "Catch2.h"
 
@@ -357,6 +360,12 @@ TEST_CASE("ExtrudeToolTest.splitBrushes")
         {{-16, 176, 16}, {16, 192, 32}}, {{-16, 192, 16}, {16, 224, 32}}};
       CHECK_THAT(bounds, Catch::UnorderedEquals(expectedBounds));
     }
+
+    CHECK_THAT(
+      kdl::vec_transform(
+        document->selectedNodes().brushes(),
+        [](const auto* brushNode) { return brushNode->linkId(); }),
+      AllDifferent<std::vector<std::string>>());
   }
 
   SECTION("split brushes inwards 48 units towards -Y")
@@ -461,6 +470,12 @@ TEST_CASE("ExtrudeToolTest.splitBrushes")
       const auto expectedBounds = std::vector<vm::bbox3>{{{-16, 224, 16}, {16, 240, 32}}};
       CHECK_THAT(bounds, Catch::UnorderedEquals(expectedBounds));
     }
+
+    CHECK_THAT(
+      kdl::vec_transform(
+        document->selectedNodes().brushes(),
+        [](const auto* brushNode) { return brushNode->linkId(); }),
+      AllDifferent<std::vector<std::string>>());
   }
 }
 } // namespace TrenchBroom::View

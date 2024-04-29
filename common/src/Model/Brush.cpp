@@ -29,19 +29,20 @@
 #include "Polyhedron.h"
 #include "Polyhedron_Matcher.h"
 
-#include <kdl/result.h>
-#include <kdl/result_fold.h>
-#include <kdl/string_utils.h>
-#include <kdl/vector_utils.h>
+#include "kdl/reflection_impl.h"
+#include "kdl/result.h"
+#include "kdl/result_fold.h"
+#include "kdl/string_utils.h"
+#include "kdl/vector_utils.h"
 
-#include <vecmath/intersection.h>
-#include <vecmath/mat.h>
-#include <vecmath/mat_ext.h>
-#include <vecmath/polygon.h>
-#include <vecmath/segment.h>
-#include <vecmath/util.h>
-#include <vecmath/vec.h>
-#include <vecmath/vec_ext.h>
+#include "vm/intersection.h"
+#include "vm/mat.h"
+#include "vm/mat_ext.h"
+#include "vm/polygon.h"
+#include "vm/segment.h"
+#include "vm/util.h"
+#include "vm/vec.h"
+#include "vm/vec_ext.h"
 
 #include <iterator>
 #include <set>
@@ -51,6 +52,9 @@
 
 namespace TrenchBroom::Model
 {
+
+kdl_reflect_impl(Brush);
+
 class Brush::CopyCallback : public BrushGeometry::CopyCallback
 {
 public:
@@ -64,11 +68,11 @@ public:
 Brush::Brush() {}
 
 Brush::Brush(const Brush& other)
-  : m_faces(other.m_faces)
-  , m_geometry(
+  : m_faces{other.m_faces}
+  , m_geometry{
       other.m_geometry
         ? std::make_unique<BrushGeometry>(*other.m_geometry, CopyCallback())
-        : nullptr)
+        : nullptr}
 {
   if (m_geometry)
   {
@@ -83,36 +87,26 @@ Brush::Brush(const Brush& other)
   }
 }
 
-Brush::Brush(Brush&& other) noexcept
-  : m_faces(std::move(other.m_faces))
-  , m_geometry(std::move(other.m_geometry))
-{
-}
+Brush::Brush(Brush&& other) noexcept = default;
 
-Brush& Brush::operator=(Brush other) noexcept
+Brush& Brush::operator=(const Brush& other)
 {
-  using std::swap;
-  swap(*this, other);
+  *this = Brush{other};
   return *this;
 }
 
-void swap(Brush& lhs, Brush& rhs) noexcept
-{
-  using std::swap;
-  swap(lhs.m_faces, rhs.m_faces);
-  swap(lhs.m_geometry, rhs.m_geometry);
-}
+Brush& Brush::operator=(Brush&& other) noexcept = default;
 
 Brush::~Brush() = default;
 
 Brush::Brush(std::vector<BrushFace> faces)
-  : m_faces(std::move(faces))
+  : m_faces{std::move(faces)}
 {
 }
 
 Result<Brush> Brush::create(const vm::bbox3& worldBounds, std::vector<BrushFace> faces)
 {
-  Brush brush(std::move(faces));
+  auto brush = Brush{std::move(faces)};
   return brush.updateGeometryFromFaces(worldBounds).transform([&]() {
     return std::move(brush);
   });
@@ -933,8 +927,7 @@ Brush::CanMoveVerticesResult Brush::doCanMoveVertices(
              == vm::plane_status::above)
       {
         const auto ray = vm::ray3(oldPos, normalize(newPos - oldPos));
-        const auto distance = face->intersectWithRay(ray, vm::side::back);
-        if (!vm::is_nan(distance))
+        if (face->intersectWithRay(ray, vm::side::back))
         {
           return CanMoveVerticesResult::rejectVertexMove();
         }
@@ -992,7 +985,7 @@ Result<void> Brush::doMoveVertices(
   return updateFacesFromGeometry(worldBounds, matcher, newGeometry, uvLock);
 }
 
-std::tuple<bool, vm::mat4x4> Brush::findTransformForUVLock(
+std::optional<vm::mat4x4> Brush::findTransformForUVLock(
   const PolyhedronMatcher<BrushGeometry>& matcher,
   BrushFaceGeometry* left,
   BrushFaceGeometry* right)
@@ -1021,7 +1014,7 @@ std::tuple<bool, vm::mat4x4> Brush::findTransformForUVLock(
   // 4 corners.)
   if (unmovedVerts.size() >= 3)
   {
-    return std::make_tuple(false, vm::mat4x4());
+    return std::nullopt;
   }
 
   std::vector<std::pair<vm::vec3, vm::vec3>> referenceVerts;
@@ -1040,7 +1033,7 @@ std::tuple<bool, vm::mat4x4> Brush::findTransformForUVLock(
   if (referenceVerts.size() < 3)
   {
     // Can't create a transform as there are not enough verts
-    return std::make_tuple(false, vm::mat4x4());
+    return std::nullopt;
   }
 
   const auto M = vm::points_transformation_matrix(
@@ -1054,10 +1047,10 @@ std::tuple<bool, vm::mat4x4> Brush::findTransformForUVLock(
   if (!(M == M))
   {
     // Transform contains nan
-    return std::make_tuple(false, vm::mat4x4());
+    return std::nullopt;
   }
 
-  return std::make_tuple(true, M);
+  return M;
 }
 
 void Brush::applyUVLock(
@@ -1065,36 +1058,35 @@ void Brush::applyUVLock(
   const BrushFace& leftFace,
   BrushFace& rightFace)
 {
-  const auto [success, M] =
-    findTransformForUVLock(matcher, leftFace.geometry(), rightFace.geometry());
-  if (!success)
+  if (
+    const auto M =
+      findTransformForUVLock(matcher, leftFace.geometry(), rightFace.geometry()))
   {
-    return;
-  }
 
-  // We want to re-set the texturing of `rightFace` using the texturing from M * leftFace.
-  // We don't want to disturb the actual geometry of `rightFace` which is already
-  // finalized. So the idea is, clone `leftFace`, transform it by M using texture lock,
-  // then copy the texture settings from the transformed clone (which should have an
-  // identical plane to `rightFace` within FP error) to `rightFace`.
-  BrushFace leftClone = leftFace;
-  leftClone.transform(M, true)
-    .transform([&]() {
-      auto snapshot =
-        std::unique_ptr<TexCoordSystemSnapshot>(leftClone.takeTexCoordSystemSnapshot());
-      rightFace.setAttributes(leftClone.attributes());
-      if (snapshot)
-      {
-        // Note, the wrap style doesn't matter because the source and destination faces
-        // should have the same plane
-        rightFace.copyTexCoordSystemFromFace(
-          *snapshot, leftClone.attributes(), leftClone.boundary(), WrapStyle::Rotation);
-      }
-      rightFace.resetTexCoordSystemCache();
-    })
-    .transform_error([](auto) {
-      // do nothing
-    });
+    // We want to re-set the texturing of `rightFace` using the texturing from M *
+    // leftFace. We don't want to disturb the actual geometry of `rightFace` which is
+    // already finalized. So the idea is, clone `leftFace`, transform it by M using
+    // texture lock, then copy the texture settings from the transformed clone (which
+    // should have an identical plane to `rightFace` within FP error) to `rightFace`.
+    BrushFace leftClone = leftFace;
+    leftClone.transform(*M, true)
+      .transform([&]() {
+        auto snapshot =
+          std::unique_ptr<TexCoordSystemSnapshot>(leftClone.takeTexCoordSystemSnapshot());
+        rightFace.setAttributes(leftClone.attributes());
+        if (snapshot)
+        {
+          // Note, the wrap style doesn't matter because the source and destination faces
+          // should have the same plane
+          rightFace.copyTexCoordSystemFromFace(
+            *snapshot, leftClone.attributes(), leftClone.boundary(), WrapStyle::Rotation);
+        }
+        rightFace.resetTexCoordSystemCache();
+      })
+      .transform_error([](auto) {
+        // do nothing
+      });
+  }
 }
 
 Result<void> Brush::updateFacesFromGeometry(
@@ -1362,4 +1354,5 @@ bool operator!=(const Brush& lhs, const Brush& rhs)
 {
   return !(lhs == rhs);
 }
+
 } // namespace TrenchBroom::Model

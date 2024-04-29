@@ -27,15 +27,16 @@
 #include "Model/Tag.h" // BrushFace inherits from Taggable
 #include "Result.h"
 
-#include <kdl/reflection_decl.h>
-#include <kdl/transform_range.h>
+#include "kdl/reflection_decl.h"
+#include "kdl/transform_range.h"
 
-#include <vecmath/plane.h>
-#include <vecmath/util.h>
-#include <vecmath/vec.h>
+#include "vm/plane.h"
+#include "vm/util.h"
+#include "vm/vec.h"
 
 #include <array>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -264,7 +265,7 @@ public:
 
   vm::vec2f textureCoords(const vm::vec3& point) const;
 
-  FloatType intersectWithRay(const vm::ray3& ray) const;
+  std::optional<FloatType> intersectWithRay(const vm::ray3& ray) const;
 
 private:
   Result<void> setPoints(

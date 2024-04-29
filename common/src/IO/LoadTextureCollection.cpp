@@ -40,13 +40,14 @@
 #include "Logger.h"
 #include "Model/GameConfig.h"
 
+#include "kdl/overload.h"
+#include "kdl/parallel.h"
+#include "kdl/path_utils.h"
+#include "kdl/result.h"
 #include "kdl/result_fold.h"
-#include <kdl/overload.h>
-#include <kdl/path_utils.h>
-#include <kdl/result.h>
-#include <kdl/string_compare.h>
-#include <kdl/string_format.h>
-#include <kdl/vector_utils.h>
+#include "kdl/string_compare.h"
+#include "kdl/string_format.h"
+#include "kdl/vector_utils.h"
 
 #include <ostream>
 #include <string>
@@ -177,7 +178,7 @@ Result<Assets::TextureCollection> loadTextureCollection(
   const std::filesystem::path& path,
   const FileSystem& gameFS,
   const Model::TextureConfig& textureConfig,
-  Logger& logger)
+  Logger&)
 {
   if (gameFS.pathInfo(path) != PathInfo::Directory)
   {
@@ -189,31 +190,33 @@ Result<Assets::TextureCollection> loadTextureCollection(
                              ? makeExtensionPathMatcher(textureConfig.extensions)
                              : matchAnyPath;
 
-  return makeReadTextureFunc(gameFS, textureConfig)
-    .join(
-      gameFS.find(path, TraversalMode::Flat, pathMatcher)
-        .transform([&](auto texturePaths) {
-          return kdl::vec_filter(std::move(texturePaths), [&](const auto& texturePath) {
-            return !shouldExclude(texturePath.stem().string(), textureConfig.excludes);
-          });
-        }))
-    .and_then([&](const auto& readTexture, auto texturePaths) {
+  return gameFS.find(path, TraversalMode::Flat, pathMatcher)
+    .transform([&](auto texturePaths) {
+      return kdl::vec_filter(std::move(texturePaths), [&](const auto& texturePath) {
+        return !shouldExclude(texturePath.stem().string(), textureConfig.excludes);
+      });
+    })
+    .join(makeReadTextureFunc(gameFS, textureConfig))
+    .and_then([&](auto texturePaths, const auto& readTexture) {
+      auto nullLogger = NullLogger{};
       return kdl::fold_results(
-               kdl::vec_transform(
-                 texturePaths,
-                 [&](const auto& texturePath) {
+               kdl::vec_parallel_transform(
+                 std::move(texturePaths),
+                 [&](const auto texturePath) {
                    return gameFS.openFile(texturePath)
-                     .and_then([&](auto file) { return readTexture(*file, texturePath); })
-                     .or_else(makeReadTextureErrorHandler(gameFS, logger))
-                     .transform([&](auto texture) {
-                       gameFS.makeAbsolute(texturePath)
-                         .transform([&](auto absPath) {
-                           texture.setAbsolutePath(std::move(absPath));
-                         })
-                         .or_else([](auto) { return kdl::void_success; });
-                       texture.setRelativePath(texturePath);
-                       return texture;
-                     });
+                     .and_then([&](const auto& file) {
+                       return readTexture(*file, texturePath)
+                         .transform([&](auto texture) {
+                           gameFS.makeAbsolute(texturePath)
+                             .transform([&](auto absPath) {
+                               texture.setAbsolutePath(std::move(absPath));
+                             })
+                             .or_else([](auto) { return kdl::void_success; });
+                           texture.setRelativePath(texturePath);
+                           return texture;
+                         });
+                     })
+                     .or_else(makeReadTextureErrorHandler(gameFS, nullLogger));
                  }))
         .transform([&](auto textures) {
           return Assets::TextureCollection{path, std::move(textures)};

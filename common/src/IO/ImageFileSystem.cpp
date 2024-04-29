@@ -26,9 +26,9 @@
 #include "IO/PathInfo.h"
 #include "IO/TraversalMode.h"
 
-#include <kdl/overload.h>
-#include <kdl/path_utils.h>
-#include <kdl/result.h>
+#include "kdl/overload.h"
+#include "kdl/path_utils.h"
+#include "kdl/result.h"
 
 #include <cassert>
 #include <memory>
@@ -273,11 +273,5 @@ Result<std::shared_ptr<File>> ImageFileSystemBase::doOpenFile(
         entry);
     },
     Result<std::shared_ptr<File>>{Error{"'" + path.string() + "' not found"}});
-}
-
-ImageFileSystem::ImageFileSystem(std::shared_ptr<CFile> file)
-  : m_file{std::move(file)}
-{
-  ensure(m_file, "file must not be null");
 }
 } // namespace TrenchBroom::IO

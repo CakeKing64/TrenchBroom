@@ -24,10 +24,10 @@
 #include "Model/Node.h"
 #include "Model/Object.h"
 
-#include <kdl/reflection_decl.h>
+#include "kdl/reflection_decl.h"
 
-#include <vecmath/bbox.h>
-#include <vecmath/vec.h>
+#include "vm/bbox.h"
+#include "vm/vec.h"
 
 #include <optional>
 
@@ -68,9 +68,9 @@ struct PatchGrid
 
 // public for testing
 std::vector<vm::vec3> computeGridNormals(
-  const std::vector<BezierPatch::Point> patchGrid,
-  const size_t pointRowCount,
-  const size_t pointColumnCount);
+  std::vector<BezierPatch::Point> patchGrid,
+  size_t pointRowCount,
+  size_t pointColumnCount);
 
 // public for testing
 PatchGrid makePatchGrid(const BezierPatch& patch, size_t subdivisionsPerSurface);
@@ -104,7 +104,7 @@ private: // implement Node interface
 
   FloatType doGetProjectedArea(vm::axis::type axis) const override;
 
-  Node* doClone(const vm::bbox3& worldBounds) const override;
+  Node* doClone(const vm::bbox3& worldBounds, SetLinkId setLinkIds) const override;
 
   bool doCanAddChild(const Node* child) const override;
   bool doCanRemoveChild(const Node* child) const override;

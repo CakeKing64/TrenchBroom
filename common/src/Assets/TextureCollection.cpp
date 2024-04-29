@@ -21,8 +21,8 @@
 
 #include "Ensure.h"
 
-#include <kdl/reflection_impl.h>
-#include <kdl/vector_utils.h>
+#include "kdl/reflection_impl.h"
+#include "kdl/vector_utils.h"
 
 #include <string>
 #include <vector>
@@ -71,11 +71,6 @@ bool TextureCollection::loaded() const
 const std::filesystem::path& TextureCollection::path() const
 {
   return m_path;
-}
-
-std::string TextureCollection::name() const
-{
-  return !m_path.empty() ? m_path.filename().string() : "";
 }
 
 size_t TextureCollection::textureCount() const

@@ -24,10 +24,10 @@
 #include "IO/TraversalMode.h"
 #include "Macros.h"
 
+#include "kdl/path_utils.h"
+#include "kdl/string_compare.h"
+#include "kdl/string_format.h"
 #include "kdl/vector_utils.h"
-#include <kdl/path_utils.h>
-#include <kdl/string_compare.h>
-#include <kdl/string_format.h>
 
 namespace TrenchBroom::IO::Disk
 {
@@ -125,7 +125,8 @@ Result<std::vector<std::filesystem::path>> find(
     break;
   case TraversalMode::Recursive:
     std::transform(
-      std::filesystem::recursive_directory_iterator{fixedPath, error},
+      std::filesystem::recursive_directory_iterator{
+        fixedPath, std::filesystem::directory_options::follow_directory_symlink, error},
       std::filesystem::recursive_directory_iterator{},
       std::back_inserter(result),
       [&](const auto& entry) { return entry.path(); });

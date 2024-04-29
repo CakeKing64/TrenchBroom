@@ -27,7 +27,7 @@
 #include "Model/BrushFace.h"
 #include "Model/BrushFaceHandle.h"
 #include "Model/ChangeBrushFaceAttributesRequest.h"
-#include "Model/ModelUtils.h"
+#include "Model/NodeQueries.h"
 #include "Model/PushSelection.h"
 #include "Model/WorldNode.h" // IWYU pragma: keep
 #include "View/BorderLine.h"
@@ -36,8 +36,8 @@
 #include "View/TextureBrowser.h"
 #include "View/TitledPanel.h"
 
-#include <kdl/memory_utils.h>
-#include <kdl/vector_utils.h>
+#include "kdl/memory_utils.h"
+#include "kdl/vector_utils.h"
 
 #include <fmt/format.h>
 

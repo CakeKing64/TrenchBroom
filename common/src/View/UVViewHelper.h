@@ -23,42 +23,41 @@
 #include "Model/BrushFaceHandle.h"
 #include "Model/HitType.h"
 
-#include <vecmath/vec.h>
+#include "vm/vec.h"
 
 #include <optional>
 
-namespace TrenchBroom
-{
-namespace Assets
+namespace TrenchBroom::Assets
 {
 class Texture;
 }
 
-namespace Renderer
+namespace TrenchBroom::Renderer
 {
 class ActiveShader;
 class Camera;
 class OrthographicCamera;
 class RenderContext;
-} // namespace Renderer
+} // namespace TrenchBroom::Renderer
 
-namespace Model
+namespace TrenchBroom::Model
 {
 class BrushFace;
 class PickResult;
-} // namespace Model
+} // namespace TrenchBroom::Model
 
-namespace View
+namespace TrenchBroom::View
 {
+
 class UVViewHelper
 {
 private:
   Renderer::OrthographicCamera& m_camera;
-  bool m_zoomValid;
+  bool m_zoomValid = false;
 
   std::optional<Model::BrushFaceHandle> m_faceHandle;
 
-  vm::vec2i m_subDivisions;
+  vm::vec2i m_subDivisions = {1, 1};
 
   /**
    The position of the scaling origin / rotation center handle in world coords.
@@ -121,5 +120,5 @@ private:
   vm::vec3 transformToCamera(const vm::vec3& point) const;
   vm::vec3 transformFromCamera(const vm::vec3& point) const;
 };
-} // namespace View
-} // namespace TrenchBroom
+
+} // namespace TrenchBroom::View

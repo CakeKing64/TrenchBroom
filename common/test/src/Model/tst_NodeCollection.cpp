@@ -32,11 +32,11 @@
 #include "Model/NodeCollection.h"
 #include "Model/PatchNode.h"
 
-#include <kdl/result.h>
-#include <kdl/result_io.h>
+#include "kdl/result.h"
+#include "kdl/result_io.h"
 
-#include <vecmath/bbox.h>
-#include <vecmath/bbox_io.h>
+#include "vm/bbox.h"
+#include "vm/bbox_io.h"
 
 #include <vector>
 
@@ -180,7 +180,7 @@ TEST_CASE("NodeCollection.has")
 
       SECTION("adding already nested brush")
       {
-        node->addChild(brushNode.clone(worldBounds));
+        node->addChild(brushNode.clone(worldBounds, SetLinkId::generate));
 
         nodeCollection.addNode(node);
         CHECK_FALSE(nodeCollection.hasBrushes());
@@ -193,7 +193,7 @@ TEST_CASE("NodeCollection.has")
         REQUIRE_FALSE(nodeCollection.hasBrushes());
         REQUIRE_FALSE(nodeCollection.hasOnlyBrushes());
 
-        node->addChild(brushNode.clone(worldBounds));
+        node->addChild(brushNode.clone(worldBounds, SetLinkId::generate));
         CHECK_FALSE(nodeCollection.hasBrushes());
         CHECK_FALSE(nodeCollection.hasOnlyBrushes());
       }

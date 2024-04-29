@@ -19,6 +19,7 @@
 
 #include "GameImpl.h"
 
+#include "Assets/EntityDefinition.h"
 #include "Assets/EntityDefinitionFileSpec.h"
 #include "Assets/EntityModel.h"
 #include "Assets/Palette.h"
@@ -64,15 +65,15 @@
 #include "Model/LayerNode.h"
 #include "Model/WorldNode.h"
 
-#include <kdl/overload.h>
-#include <kdl/path_utils.h>
-#include <kdl/result.h>
-#include <kdl/string_compare.h>
-#include <kdl/string_format.h>
-#include <kdl/string_utils.h>
-#include <kdl/vector_utils.h>
+#include "kdl/overload.h"
+#include "kdl/path_utils.h"
+#include "kdl/result.h"
+#include "kdl/string_compare.h"
+#include "kdl/string_format.h"
+#include "kdl/string_utils.h"
+#include "kdl/vector_utils.h"
 
-#include <vecmath/vec_io.h>
+#include "vm/vec_io.h"
 
 #include <fstream>
 #include <string>
@@ -288,17 +289,11 @@ std::vector<Node*> GameImpl::doParseNodes(
   const std::string& str,
   const MapFormat mapFormat,
   const vm::bbox3& worldBounds,
-  const std::vector<std::string>& linkedGroupsToKeep,
   Logger& logger) const
 {
   auto parserStatus = IO::SimpleParserStatus{logger};
   return IO::NodeReader::read(
-    str,
-    mapFormat,
-    worldBounds,
-    entityPropertyConfig(),
-    linkedGroupsToKeep,
-    parserStatus);
+    str, mapFormat, worldBounds, entityPropertyConfig(), parserStatus);
 }
 
 std::vector<BrushFace> GameImpl::doParseBrushFaces(
@@ -363,40 +358,6 @@ bool GameImpl::doIsEntityDefinitionFile(const std::filesystem::path& path) const
   });
 }
 
-Result<std::vector<Assets::EntityDefinition*>> GameImpl::doLoadEntityDefinitions(
-  IO::ParserStatus& status, const std::filesystem::path& path) const
-{
-  const auto extension = path.extension().string();
-  const auto& defaultColor = m_config.entityConfig.defaultColor;
-
-  if (kdl::ci::str_is_equal(".fgd", extension))
-  {
-    return IO::Disk::openFile(path).transform([&](auto file) {
-      auto reader = file->reader().buffer();
-      auto parser = IO::FgdParser{reader.stringView(), defaultColor, path};
-      return parser.parseDefinitions(status);
-    });
-  }
-  if (kdl::ci::str_is_equal(".def", extension))
-  {
-    return IO::Disk::openFile(path).transform([&](auto file) {
-      auto reader = file->reader().buffer();
-      auto parser = IO::DefParser{reader.stringView(), defaultColor};
-      return parser.parseDefinitions(status);
-    });
-  }
-  if (kdl::ci::str_is_equal(".ent", extension))
-  {
-    return IO::Disk::openFile(path).transform([&](auto file) {
-      auto reader = file->reader().buffer();
-      auto parser = IO::EntParser{reader.stringView(), defaultColor};
-      return parser.parseDefinitions(status);
-    });
-  }
-
-  return Error{"Unknown entity definition format: '" + path.string() + "'"};
-}
-
 std::vector<Assets::EntityDefinitionFileSpec> GameImpl::doAllEntityDefinitionFiles() const
 {
   return kdl::vec_transform(m_config.entityConfig.defFilePaths, [](const auto& path) {
@@ -446,6 +407,47 @@ std::filesystem::path GameImpl::doFindEntityDefinitionFile(
   }
 
   return IO::Disk::resolvePath(searchPaths, path);
+}
+
+Result<std::vector<std::unique_ptr<Assets::EntityDefinition>>> GameImpl::
+  loadEntityDefinitions(IO::ParserStatus& status, const std::filesystem::path& path) const
+{
+  const auto extension = path.extension().string();
+  const auto& defaultColor = m_config.entityConfig.defaultColor;
+
+  try
+  {
+    if (kdl::ci::str_is_equal(".fgd", extension))
+    {
+      return IO::Disk::openFile(path).transform([&](auto file) {
+        auto reader = file->reader().buffer();
+        auto parser = IO::FgdParser{reader.stringView(), defaultColor, path};
+        return parser.parseDefinitions(status);
+      });
+    }
+    if (kdl::ci::str_is_equal(".def", extension))
+    {
+      return IO::Disk::openFile(path).transform([&](auto file) {
+        auto reader = file->reader().buffer();
+        auto parser = IO::DefParser{reader.stringView(), defaultColor};
+        return parser.parseDefinitions(status);
+      });
+    }
+    if (kdl::ci::str_is_equal(".ent", extension))
+    {
+      return IO::Disk::openFile(path).transform([&](auto file) {
+        auto reader = file->reader().buffer();
+        auto parser = IO::EntParser{reader.stringView(), defaultColor};
+        return parser.parseDefinitions(status);
+      });
+    }
+
+    return Error{"Unknown entity definition format: '" + path.string() + "'"};
+  }
+  catch (const ParserException& e)
+  {
+    return Error{e.what()};
+  }
 }
 
 std::unique_ptr<Assets::EntityModel> GameImpl::doInitializeModel(

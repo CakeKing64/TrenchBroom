@@ -31,18 +31,16 @@
 #include "Model/GameConfig.h"
 #include "TestUtils.h"
 
-#include <kdl/reflection_impl.h>
-#include <kdl/result.h>
-#include <kdl/vector_utils.h>
+#include "kdl/reflection_impl.h"
+#include "kdl/result.h"
+#include "kdl/vector_utils.h"
 
 #include <filesystem>
 #include <string>
 
 #include "Catch2.h"
 
-namespace TrenchBroom
-{
-namespace IO
+namespace TrenchBroom::IO
 {
 
 namespace
@@ -219,5 +217,5 @@ TEST_CASE("loadTextureCollection")
       });
   }
 }
-} // namespace IO
-} // namespace TrenchBroom
+
+} // namespace TrenchBroom::IO

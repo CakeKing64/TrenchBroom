@@ -25,27 +25,26 @@
 #include "Model/HitType.h"
 #include "Model/Object.h"
 
-#include <kdl/result_forward.h>
+#include "kdl/result_forward.h"
 
-#include <vecmath/bbox.h>
-#include <vecmath/forward.h>
-#include <vecmath/util.h>
+#include "vm/bbox.h"
+#include "vm/forward.h"
+#include "vm/util.h"
 
 #include <optional>
 #include <string>
 #include <vector>
 
-namespace TrenchBroom
-{
-namespace Assets
+namespace TrenchBroom::Assets
 {
 enum class PitchType;
 class EntityModelFrame;
 struct ModelSpecification;
-} // namespace Assets
+} // namespace TrenchBroom::Assets
 
-namespace Model
+namespace TrenchBroom::Model
 {
+
 struct EntityPropertyConfig;
 
 class EntityNode : public EntityNodeBase, public Object
@@ -79,7 +78,7 @@ private: // implement Node interface
 
   FloatType doGetProjectedArea(vm::axis::type axis) const override;
 
-  Node* doClone(const vm::bbox3& worldBounds) const override;
+  Node* doClone(const vm::bbox3& worldBounds, SetLinkId setLinkIds) const override;
 
   bool doCanAddChild(const Node* child) const override;
   bool doCanRemoveChild(const Node* child) const override;
@@ -127,5 +126,5 @@ private: // implement Taggable interface
 private:
   deleteCopyAndMove(EntityNode);
 };
-} // namespace Model
-} // namespace TrenchBroom
+
+} // namespace TrenchBroom::Model

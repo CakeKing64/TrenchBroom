@@ -24,7 +24,7 @@
 #include "View/MapDocumentCommandFacade.h"
 #include "View/UpdateLinkedGroupsCommand.h"
 
-#include <kdl/result.h>
+#include "kdl/result.h"
 
 #include <string>
 
@@ -41,7 +41,7 @@ UpdateLinkedGroupsCommandBase::UpdateLinkedGroupsCommandBase(
 {
 }
 
-UpdateLinkedGroupsCommandBase::~UpdateLinkedGroupsCommandBase() {}
+UpdateLinkedGroupsCommandBase::~UpdateLinkedGroupsCommandBase() = default;
 
 std::unique_ptr<CommandResult> UpdateLinkedGroupsCommandBase::performDo(
   MapDocumentCommandFacade* document)

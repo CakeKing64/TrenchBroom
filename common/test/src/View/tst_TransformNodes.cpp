@@ -33,16 +33,16 @@
 #include "Preferences.h"
 #include "TestUtils.h"
 
-#include <kdl/result.h>
-#include <kdl/vector_utils.h>
-#include <kdl/zip_iterator.h>
+#include "kdl/result.h"
+#include "kdl/vector_utils.h"
+#include "kdl/zip_iterator.h"
 
-#include <vecmath/approx.h>
-#include <vecmath/mat.h>
-#include <vecmath/mat_ext.h>
-#include <vecmath/mat_io.h>
-#include <vecmath/vec.h>
-#include <vecmath/vec_io.h>
+#include "vm/approx.h"
+#include "vm/mat.h"
+#include "vm/mat_ext.h"
+#include "vm/mat_io.h"
+#include "vm/vec.h"
+#include "vm/vec_io.h"
 
 #include <vector>
 
@@ -171,8 +171,8 @@ TEST_CASE_METHOD(MapDocumentTest, "TransformNodesTest.transformObjects")
 
     document->addNodes({{document->parentForNodes(), {node}}});
 
-    const auto originalNode =
-      std::unique_ptr<Model::Node>{node->cloneRecursively(document->worldBounds())};
+    const auto originalNode = std::unique_ptr<Model::Node>{
+      node->cloneRecursively(document->worldBounds(), Model::SetLinkId::generate)};
     const auto transformation = vm::translation_matrix(vm::vec3d{1, 2, 3});
 
     WHEN("The node is transformed")
